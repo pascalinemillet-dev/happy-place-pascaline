@@ -1,0 +1,1 @@
+ALTER TABLE public.manager_teams ADD CONSTRAINT manager_teams_team_unique UNIQUE (team);
