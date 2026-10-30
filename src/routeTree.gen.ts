@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
-import { Route as ChoisirRoleRouteImport } from './routes/choisir-role'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedManageRouteImport } from './routes/_authenticated/manage'
@@ -29,11 +28,6 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ChoisirRoleRoute = ChoisirRoleRouteImport.update({
-  id: '/choisir-role',
-  path: '/choisir-role',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -90,7 +84,6 @@ const AuthenticatedManageUsersRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
-  '/choisir-role': typeof ChoisirRoleRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/manage': typeof AuthenticatedManageRouteWithChildren
   '/manage/blockers': typeof AuthenticatedManageBlockersRoute
@@ -102,7 +95,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
-  '/choisir-role': typeof ChoisirRoleRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/': typeof AuthenticatedIndexRoute
   '/manage/blockers': typeof AuthenticatedManageBlockersRoute
@@ -116,7 +108,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
-  '/choisir-role': typeof ChoisirRoleRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/manage': typeof AuthenticatedManageRouteWithChildren
   '/_authenticated/': typeof AuthenticatedIndexRoute
@@ -132,7 +123,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
-    | '/choisir-role'
     | '/sitemap.xml'
     | '/manage'
     | '/manage/blockers'
@@ -144,7 +134,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
-    | '/choisir-role'
     | '/sitemap.xml'
     | '/'
     | '/manage/blockers'
@@ -157,7 +146,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/auth'
-    | '/choisir-role'
     | '/sitemap.xml'
     | '/_authenticated/manage'
     | '/_authenticated/'
@@ -172,7 +160,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
-  ChoisirRoleRoute: typeof ChoisirRoleRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
 }
 
@@ -190,13 +177,6 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/choisir-role': {
-      id: '/choisir-role'
-      path: '/choisir-role'
-      fullPath: '/choisir-role'
-      preLoaderRoute: typeof ChoisirRoleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -302,7 +282,6 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
-  ChoisirRoleRoute: ChoisirRoleRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
 }
 export const routeTree = rootRouteImport
