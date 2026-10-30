@@ -98,7 +98,7 @@ La base contient aussi dix membres fictifs de Bigger Boat (`@biggerboat.example`
 - **Modifier la base** : écris une nouvelle migration SQL plutôt que de modifier les anciennes. Après toute modification d'ENUM, de trigger ou de statut, lance `select * from private.run_smoke_tests();` : toutes les lignes doivent revenir à `ok = true`.
 - **Règles du projet** : le fichier `AGENTS.md` liste les conventions à respecter. Donne-le à ton assistant IA de code.
 - **Tâches automatiques** : deux tâches tournent chaque nuit dans Supabase (revalidation annuelle des contenus, départs programmés des collaborateurs). Tu les retrouves dans le module **Cron** de Supabase.
-- **Mise en ligne** : l'app tourne sur un serveur Node (TanStack Start). Elle se déploie sur Vercel ou Netlify : ajoute `VITE_SUPABASE_URL` et `VITE_SUPABASE_PUBLISHABLE_KEY` dans les variables d'environnement de l'hébergeur.
+- **Mise en ligne** : l'app est déployée sur Cloudflare Workers, branché sur ce dépôt GitHub (Workers Builds) : chaque envoi sur `main` redéploie l'app. Le build Nitro détecte Cloudflare tout seul (preset `cloudflare_module`) et complète `wrangler.jsonc`. Dans Cloudflare, `VITE_SUPABASE_URL` et `VITE_SUPABASE_PUBLISHABLE_KEY` se saisissent en **variables de build**, car Vite les intègre au moment du build.
 
 ## En cas de problème
 

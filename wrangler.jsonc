@@ -1,0 +1,9 @@
+// Cloudflare Workers (lot 0, T9).
+// Le build (Nitro, preset cloudflare_module, détecté automatiquement par Workers Builds)
+// complète ce fichier : point d'entrée, fichiers statiques, nodejs_compat.
+// Le nom doit être identique à celui du Worker créé dans le tableau de bord Cloudflare.
+{
+  "name": "happy-place-pascaline",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true }
+}
