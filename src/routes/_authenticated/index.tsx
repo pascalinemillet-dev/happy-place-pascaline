@@ -261,6 +261,7 @@ function ManagerSpace() {
             <p className="text-body-md text-primary">
               {sent.kind === "point bloquant" ? "Point bloquant envoyé" : "Idée envoyée"}
               {sent.assignedTo ? ` à ${sent.assignedTo}.` : "."}
+              {sent.kind === "point bloquant" ? " Vous êtes en copie de l'e-mail." : ""}
             </p>
             <div className="flex items-center gap-sm">
               <a href="#mes-soumissions" className="font-label-sm text-label-sm text-primary underline">

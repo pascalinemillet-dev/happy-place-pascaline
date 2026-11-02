@@ -43,7 +43,7 @@ export function assigneeLine(kind: SubmissionKind, managers: string[]): string {
 
 export function assigneeHint(kind: SubmissionKind, managers: string[]): string {
   if (kind === "point bloquant")
-    return "La première personne qui le traite le publie ou le refuse.";
+    return "La première personne qui le traite le publie ou le refuse. Vous serez en copie de l'e-mail.";
   return managers.length === 0
     ? "Aucun manager inscrit dans votre équipe : l'administration examinera votre idée."
     : "Vos managers examineront votre idée.";
