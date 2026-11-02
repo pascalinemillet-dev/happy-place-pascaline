@@ -341,24 +341,6 @@ export async function fetchMetrics(): Promise<Metric[]> {
   return (data ?? []) as Metric[];
 }
 
-export async function updateMetric(input: {
-  key: string;
-  value: number;
-  period_start: string;
-  period_end: string;
-}) {
-  const { error } = await db
-    .from("metrics")
-    .update({
-      value: input.value,
-      period_start: input.period_start,
-      period_end: input.period_end,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("key", input.key);
-  if (error) throw error;
-}
-
 export function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const min = Math.round(diff / 60000);
