@@ -324,7 +324,6 @@ function BlockerCard({
   const assignees = useQuery({
     queryKey: ["assignees", "manager", s.team],
     queryFn: () => fetchAssigneeNames(s.team),
-    enabled: canReview,
     retry: false,
   });
   const assigned = [...(assignees.data ?? []), ADMIN_LABEL].join(" · ");
