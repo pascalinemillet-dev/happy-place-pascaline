@@ -87,6 +87,13 @@ async function askAi(
   }
 }
 
+/** Garde l'objet JSON d'une réponse, même entouré de texte ou de balises ```json. */
+function jsonPart(raw: string): string {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  return start >= 0 && end > start ? raw.slice(start, end + 1) : raw;
+}
+
 /** Consigne du titre (US31) : versionnée ici, envoyée à Make à chaque appel. */
 export const PROMPT_TITRE =
   "Tu rédiges des titres de points bloquants pour un tableau de bord interne. " +
@@ -257,7 +264,7 @@ export const generateTeamRecap = createServerFn({ method: "POST" })
       const raw = await askAi("recap", PROMPT_RECAP, JSON.stringify(payload), true);
       try {
         const parsed = raw
-          ? (JSON.parse(raw) as { items?: { id?: unknown; text?: unknown }[] })
+          ? (JSON.parse(jsonPart(raw)) as { items?: { id?: unknown; text?: unknown }[] })
           : null;
         for (const it of parsed?.items ?? []) {
           if (typeof it.id === "string" && typeof it.text === "string" && it.text.trim()) {
