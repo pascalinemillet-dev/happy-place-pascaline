@@ -110,7 +110,11 @@ export function PendingQueue({
     <div className="flex flex-wrap items-center justify-between gap-xs border-b border-outline-variant pb-sm mb-md">
       <div>
         <h2 className="font-headline-sm text-headline-sm text-primary">Soumissions en attente</h2>
-        {canReview && <ModuleHint module="soumissions-en-attente" />}
+        {canReview && (
+          <ModuleHint
+            module={role === "admin" ? "soumissions-en-attente-admin" : "soumissions-en-attente"}
+          />
+        )}
       </div>
       <p
         className="font-label-sm text-label-sm text-on-surface-variant uppercase"
