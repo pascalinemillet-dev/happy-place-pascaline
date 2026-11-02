@@ -41,6 +41,30 @@ export const submissionSchema = z.object({
     ctx.addIssue({ code: "custom", path: ["rejection_note"], message: rejectionTooLong(v.rejection_note.trim().length) });
 });
 
+/** Formulaire « Soumettre » (F1) : type, sévérité pour un point bloquant, description de 5 à 2 000 caractères. */
+export const newSubmissionSchema = z
+  .object({
+    kind: z.enum(["idée", "point bloquant"], { errorMap: () => ({ message: "Choisis le type de ta soumission" }) }),
+    severity: z.enum(["critical", "warning", "info"]).nullable(),
+    author_name: z.string().trim().min(1, "Ton nom est introuvable : recharge la page"),
+    team: z.string().trim().min(2, "Choisis une de tes équipes").max(60, "60 caractères maximum"),
+    content: z
+      .string()
+      .trim()
+      .min(5, "Décris ta soumission (5 caractères minimum)")
+      .superRefine((v, ctx) => {
+        if (v.length > 2000)
+          ctx.addIssue({
+            code: "custom",
+            message: `Ta description dépasse 2 000 caractères (${v.length.toLocaleString("fr-FR")} saisis). Raccourcis-la avant d'envoyer.`,
+          });
+      }),
+  })
+  .superRefine((v, ctx) => {
+    if (v.kind === "point bloquant" && !v.severity)
+      ctx.addIssue({ code: "custom", path: ["severity"], message: "Choisis la sévérité du point bloquant" });
+  });
+
 export const blockerSchema = z.object({
   title: z.string().trim().min(3, "Le titre doit faire au moins 3 caractères").max(160, "160 caractères maximum"),
   description: z.string().trim().max(2000, "2000 caractères maximum"),

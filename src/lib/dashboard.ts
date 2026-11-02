@@ -32,6 +32,20 @@ export type Submission = {
   submitted_by_email?: string | null;
   attachment_path?: string | null;
   attachment_name?: string | null;
+  kind: SubmissionKind;
+  severity?: BlockerSeverity | null;
+  proposed_title?: string | null;
+  proposed_title_by_ai?: boolean;
+  blocker_id?: string | null;
+};
+
+export type SubmissionKind = Enums["submission_kind"];
+export type BlockerSeverity = Enums["blocker_severity"];
+
+export const SEVERITY_LABELS: Record<BlockerSeverity, string> = {
+  critical: "Critique",
+  warning: "Avertissement",
+  info: "Information",
 };
 
 export const REJECTION_CATEGORIES = [
@@ -243,12 +257,13 @@ export async function fetchResolvedBlockers(): Promise<Blocker[]> {
 
 export type ValidatedSubmission = Submission & { validated_at: string | null };
 
-/** Demandes validées, toutes équipes (filtrées par les règles d'accès de la base). */
+/** Idées validées, toutes équipes (filtrées par les règles d'accès de la base). */
 export async function fetchValidatedSubmissions(): Promise<ValidatedSubmission[]> {
   const { data, error } = await db
     .from("submissions")
     .select("*")
     .eq("status", "validée")
+    .eq("kind", "idée")
     .order("created_at", { ascending: false });
   if (error) throw error;
   const rows = (data ?? []) as Submission[];
@@ -389,7 +404,12 @@ export async function createSubmission(input: SubmissionInput) {
 export const ATTACHMENT_BUCKET = "submission-attachments";
 export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
-export async function submitIdea(input: Omit<SubmissionInput, "status">, file?: File | null) {
+export type NewSubmission = Omit<SubmissionInput, "status"> & {
+  kind: SubmissionKind;
+  severity: BlockerSeverity | null;
+};
+
+export async function submitSubmission(input: NewSubmission, file?: File | null) {
   let attachment_path: string | null = null;
   let attachment_name: string | null = null;
   if (file) {
@@ -406,6 +426,7 @@ export async function submitIdea(input: Omit<SubmissionInput, "status">, file?: 
   }
   const { error } = await db.from("submissions").insert({
     author_name: input.author_name, team: input.team, content: input.content, status: "en attente",
+    kind: input.kind, severity: input.kind === "point bloquant" ? input.severity : null,
     attachment_path, attachment_name,
   });
   if (error) throw error;

@@ -14,6 +14,7 @@ import {
   TextInput,
 } from "@/components/manage/crud-ui";
 import { blockerSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
+import { fetchTeamNames } from "@/lib/f1";
 import {
   createBlocker,
   deleteBlocker,
@@ -49,7 +50,7 @@ const empty: BlockerInput = {
   description: "",
   department: "",
   severity: "warning",
-  status: "EN COURS",
+  status: "OUVERT",
 };
 
 function ManageBlockers() {
@@ -60,6 +61,7 @@ function ManageBlockers() {
   const [toDelete, setToDelete] = useState<Blocker | null>(null);
 
   const list = useQuery({ queryKey: ["blockers", "all"], queryFn: fetchAllBlockers, retry: false });
+  const teams = useQuery({ queryKey: ["teams"], queryFn: fetchTeamNames, retry: false });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["blockers"] });
   const onError = (e: unknown) => toast.error((e as Error).message);
 
@@ -182,12 +184,21 @@ function ManageBlockers() {
               />
             </Field>
             <Field label="Pôle concerné" error={errors.department}>
-              <TextInput
+              <Select
                 value={form.department}
-                maxLength={60}
-                placeholder="Ex. Data & IA"
                 onChange={(e) => setForm({ ...form, department: e.target.value })}
-              />
+              >
+                <option value="">Choisis une équipe</option>
+                {/* Un pôle saisi à la main avant F1 reste sélectionnable jusqu'à sa correction. */}
+                {form.department && !teams.data?.includes(form.department) && (
+                  <option value={form.department}>{form.department} (hors référentiel)</option>
+                )}
+                {teams.data?.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </Select>
             </Field>
             <Field label="Sévérité" error={errors.severity}>
               <Select

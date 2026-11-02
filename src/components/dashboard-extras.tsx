@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { AttachmentLink } from "@/components/attachment-link";
 import { SubmissionPreview, formatExactDate } from "@/components/expandable-card";
 import { fetchResolvedBlockers, fetchValidatedSubmissions, type Submission } from "@/lib/dashboard";
+import { trackEvent } from "@/lib/f1";
+import { useModuleViewed } from "@/lib/use-module-viewed";
 
 /** Fenêtre « Archive des points bloquants » (lecture seule, statut RÉSOLU). */
 export function BlockerArchive({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -78,6 +80,7 @@ export function ValidatedSubmissions({
   const q = useQuery({ queryKey: ["submissions", "validated"], queryFn: fetchValidatedSubmissions, retry: false });
   const [team, setTeam] = useState("");
   const [limit, setLimit] = useState(PAGE);
+  const ref = useModuleViewed<HTMLElement>("idees_validees");
   const teams = useMemo(
     () => [...new Set((q.data ?? []).map((s) => s.team))].sort((a, b) => a.localeCompare(b, "fr")),
     [q.data],
@@ -86,15 +89,19 @@ export function ValidatedSubmissions({
   const shown = filtered.slice(0, limit);
 
   return (
-    <section className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md">
+    <section ref={ref} className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md">
       <div className="flex flex-wrap items-center justify-between gap-sm border-b border-outline-variant pb-sm mb-md">
-        <h2 className="font-headline-sm text-headline-sm text-primary">Demandes validées</h2>
+        <h2 className="font-headline-sm text-headline-sm text-primary">Idées validées</h2>
         <label className="flex items-center gap-xs font-label-sm text-label-sm text-on-surface-variant min-w-0">
           <span className="sr-only">Filtrer par équipe</span>
           <select
             aria-label="Filtrer par équipe"
             value={team}
-            onChange={(e) => { setTeam(e.target.value); setLimit(PAGE); }}
+            onChange={(e) => {
+              setTeam(e.target.value);
+              setLimit(PAGE);
+              trackEvent("validated_list_expanded", "idees_validees", { action: "filtre_equipe" });
+            }}
             className="max-w-full bg-card border border-outline-variant p-xs focus:outline-none focus:border-primary"
           >
             <option value="">Toutes les équipes</option>
@@ -103,9 +110,9 @@ export function ValidatedSubmissions({
         </label>
       </div>
       {q.isLoading && <p className="text-body-sm text-on-surface-variant">Chargement…</p>}
-      {q.isError && <p className="text-body-sm text-error">Les demandes validées sont indisponibles.</p>}
+      {q.isError && <p className="text-body-sm text-error">Les idées validées sont indisponibles.</p>}
       {q.data && filtered.length === 0 && (
-        <p className="text-body-sm text-on-surface-variant italic">Aucune demande validée pour le moment.</p>
+        <p className="text-body-sm text-on-surface-variant italic">Aucune idée validée pour le moment.</p>
       )}
       <div className="grid gap-xs md:grid-cols-2">
         {shown.map((s) => (
@@ -127,7 +134,10 @@ export function ValidatedSubmissions({
       {filtered.length > limit && (
         <button
           type="button"
-          onClick={() => setLimit((l) => l + PAGE)}
+          onClick={() => {
+            setLimit((l) => l + PAGE);
+            trackEvent("validated_list_expanded", "idees_validees", { action: "afficher_plus" });
+          }}
           className="mt-md font-label-sm text-label-sm text-primary underline"
         >
           Afficher plus ({filtered.length - limit} restantes)

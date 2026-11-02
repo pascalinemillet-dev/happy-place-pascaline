@@ -4,41 +4,35 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ErrorSummary, Field, FormActions, Modal, TextArea, TextInput } from "@/components/manage/crud-ui";
-import { rejectionSchema, submissionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
 import { BrandHeader } from "@/components/brand-header";
-import { AttachmentLink } from "@/components/attachment-link";
-import { CharCounter, SubmissionPreview, rejectionErrorMessage } from "@/components/expandable-card";
-import { Linkify } from "@/components/linkify";
 import { SubmissionReader } from "@/components/submission-reader";
 import { NewsReader } from "@/components/news-reader";
 import { DepartureNotices } from "@/components/departure-notices";
 import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
 import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
 import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
+import { PendingQueue } from "@/components/submissions/pending-queue";
+import { MySubmissions } from "@/components/submissions/my-submissions";
+import { SubmitModal, type SentSubmission } from "@/components/submissions/submit-modal";
+import { TeamRecapPanel } from "@/components/submissions/team-recap-panel";
+import { useModuleViewed } from "@/lib/use-module-viewed";
 import { Button } from "@/components/ui/button";
 import {
   fetchBlockers,
   fetchMetrics,
   deltaText,
   fetchNews,
-  fetchSubmissions,
-  fetchMySubmissions,
   exportMyRecentSubmissions,
-  REJECTION_CATEGORIES,
   type News,
   type Submission,
   saveDraftNews,
   publishDraftNews,
   deleteDraftNews,
-  reviewSubmission,
-  submitIdea,
   timeAgo,
   updateBlockerStatus,
   updateMetric,
   TREND_LABELS,
   type Metric,
-  type SubmissionInput,
 } from "@/lib/dashboard";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -115,8 +109,12 @@ function ManagerSpace() {
   const [showLinkErrs, setShowLinkErrs] = useState(false);
   const newsLinkErrs = showLinkErrs ? linkErrors(media.links) : {};
   const [nps, setNps] = useState<string>("");
-  const [submissionForm, setSubmissionForm] = useState<SubmissionInput | null>(null);
-  const [submissionErrors, setSubmissionErrors] = useState<FieldErrors>({});
+  const [submitOpen, setSubmitOpen] = useState(false);
+  const [sent, setSent] = useState<SentSubmission | null>(null);
+  const [recapOpen, setRecapOpen] = useState(false);
+  const newsRef = useModuleViewed<HTMLElement>("actus");
+  const blockersRef = useModuleViewed<HTMLElement>("points_bloquants");
+  const metricsRef = useModuleViewed<HTMLElement>("indicateurs");
   const myTeams = useQuery({
     queryKey: ["manager_teams", "mine", email],
     enabled: role === "manager" && !!email,
@@ -129,26 +127,11 @@ function ManagerSpace() {
       return (data ?? []).map((t) => t.team).sort();
     },
   });
-  const [attachment, setAttachment] = useState<File | null>(null);
-  const [rejecting, setRejecting] = useState<Submission | null>(null);
   const [reading, setReading] = useState<Submission | null>(null);
   const [readingNews, setReadingNews] = useState<News | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const [rejectForm, setRejectForm] = useState({ rejection_category: "", rejection_note: "" });
-  const [rejectErrors, setRejectErrors] = useState<FieldErrors>({});
 
   const news = useQuery({ queryKey: ["news"], queryFn: fetchNews, retry: false });
-  const submissions = useQuery({
-    queryKey: ["submissions"],
-    queryFn: fetchSubmissions,
-    retry: false,
-  });
-  const mine = useQuery({
-    queryKey: ["submissions", "mine", email],
-    queryFn: () => fetchMySubmissions(email ?? ""),
-    enabled: !!email,
-    retry: false,
-  });
   const blockers = useQuery({ queryKey: ["blockers"], queryFn: fetchBlockers, retry: false });
   const metrics = useQuery({ queryKey: ["metrics"], queryFn: fetchMetrics, retry: false });
   const onError = (e: unknown) => toast.error((e as Error).message);
@@ -200,43 +183,6 @@ function ManagerSpace() {
     onError,
   });
 
-  const review = useMutation({
-    mutationFn: reviewSubmission,
-    onSuccess: (_d, vars) => {
-      if (vars.status === "refusée") {
-        setRejecting(null);
-        toast.success("Soumission refusée");
-      } else {
-        setReading((r) => (r?.id === vars.id ? null : r));
-      }
-      qc.invalidateQueries({ queryKey: ["submissions"] });
-    },
-    onError: (e: unknown) => toast.error(rejectionErrorMessage(e)),
-  });
-
-  function startReject(s: Submission) {
-    setReading(null);
-    setRejecting(s);
-    setRejectErrors({});
-    setRejectForm({ rejection_category: "", rejection_note: "" });
-  }
-
-  const submit = useMutation({
-    mutationFn: (input: SubmissionInput) => submitIdea({
-      author_name: input.author_name,
-      team: input.team,
-      content: input.content,
-    }, attachment),
-    onSuccess: () => {
-      setSubmissionForm(null);
-      setAttachment(null);
-      setSubmissionErrors({});
-      toast.success("Soumission envoyée");
-      qc.invalidateQueries({ queryKey: ["submissions"] });
-    },
-    onError: (e: unknown) => toast.error(rejectionErrorMessage(e)),
-  });
-
   const setBlocker = useMutation({
     mutationFn: updateBlockerStatus,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["blockers"] }),
@@ -258,21 +204,6 @@ function ManagerSpace() {
   const npsMetric = metricOf(metrics.data, "nps");
   const roleLabel = role === "admin" ? "ADMIN" : role === "manager" ? "MANAGER" : "COLLABORATEUR";
 
-  function sendSubmission(e: React.FormEvent) {
-    e.preventDefault();
-    if (!submissionForm) return;
-    // Collaborators: team is set server-side from their account
-    // Admin: always the « Admin » team (set server-side); manager: one of their teams
-    const team = role === "collaborateur" ? "auto" : role === "admin" ? "Admin" : submissionForm.team;
-    const result = validate(submissionSchema, { ...submissionForm, team, status: "en attente" });
-    if (!result.ok) {
-      setSubmissionErrors(result.errors);
-      return;
-    }
-    setSubmissionErrors({});
-    submit.mutate(result.data);
-  }
-
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
       <BrandHeader />
@@ -286,13 +217,12 @@ function ManagerSpace() {
             <h1 className="font-headline-lg text-headline-lg text-primary">Happy Place</h1>
             <button
               onClick={() => {
-                setSubmissionErrors({});
-                const only = role === "manager" && myTeams.data?.length === 1 ? myTeams.data[0] : "";
-                setSubmissionForm({ author_name: "", team: only, content: "", status: "en attente" });
+                setSent(null);
+                setSubmitOpen(true);
               }}
               className="flex items-center gap-xs px-md py-xs bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 transition-all shadow-sm"
             >
-              <Icon name="add" /> SOUMETTRE UNE IDÉE
+              <Icon name="add" /> SOUMETTRE
             </button>
           </div>
           <div className="flex flex-wrap gap-xs items-center md:items-end md:justify-end">
@@ -323,9 +253,34 @@ function ManagerSpace() {
           </div>
         </div>
 
+        {sent && (
+          <div
+            role="status"
+            className="flex flex-wrap items-center justify-between gap-sm border border-outline-variant border-l-4 border-l-tertiary-fixed-dim bg-card p-sm"
+          >
+            <p className="text-body-md text-primary">
+              {sent.kind === "point bloquant" ? "Point bloquant envoyé" : "Idée envoyée"}
+              {sent.assignedTo ? ` à ${sent.assignedTo}.` : "."}
+            </p>
+            <div className="flex items-center gap-sm">
+              <a href="#mes-soumissions" className="font-label-sm text-label-sm text-primary underline">
+                VOIR MES SOUMISSIONS
+              </a>
+              <button
+                type="button"
+                aria-label="Fermer le message"
+                onClick={() => setSent(null)}
+                className="text-on-surface-variant hover:text-primary"
+              >
+                <Icon name="close" />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="bento-grid">
           {/* News Management & Input */}
-          <section className="col-span-12 lg:col-span-8 bg-surface-container-lowest border border-outline-variant p-md flex flex-col gap-md">
+          <section ref={newsRef} className="col-span-12 lg:col-span-8 bg-surface-container-lowest border border-outline-variant p-md flex flex-col gap-md">
             <div className="flex items-center justify-between border-b border-outline-variant pb-sm">
               <h2 className="font-headline-sm text-headline-sm text-primary">
                 Actualités du cabinet
@@ -527,90 +482,17 @@ function ManagerSpace() {
             </div>
           </section>
 
-          {/* Pending Submissions */}
+          {/* Soumissions en attente (US63) */}
           <section className="col-span-12 lg:col-span-4 min-w-0 bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
-            <div className="flex items-center justify-between border-b border-outline-variant pb-sm mb-md">
-              <h2 className="font-headline-sm text-headline-sm text-primary">
-                Soumissions en attente
-              </h2>
-              <div className="bg-tertiary-fixed text-on-tertiary-fixed px-xs py-1 rounded-full font-label-sm text-label-sm">
-                {submissions.data?.length ?? 0} NOUVELLES
-              </div>
-            </div>
-            <div className="space-y-sm flex-grow min-w-0">
-              {submissions.isError && (
-                <p className="text-body-sm text-error">
-                  Les soumissions sont indisponibles.
-                </p>
-              )}
-              {submissions.data?.length === 0 && (
-                <p className="text-body-sm text-on-surface-variant italic">
-                  Aucune soumission en attente.
-                </p>
-              )}
-              {submissions.data?.map((s) => (
-                <div
-                  key={s.id}
-                  className="p-sm border border-outline-variant bg-card space-y-sm min-w-0 overflow-hidden"
-                >
-                  <div className="flex items-center gap-sm">
-                    <div className="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center">
-                      <Icon name="person" className="text-sm" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-body-sm text-primary font-bold wrap-anywhere">{s.author_name}</p>
-                      <p className="text-[10px] text-on-surface-variant font-label-sm wrap-anywhere">{s.team}</p>
-                    </div>
-                    <span className="text-[10px] text-on-surface-variant font-label-sm whitespace-nowrap">
-                      {timeAgo(s.created_at)}
-                    </span>
-                  </div>
-                  <SubmissionPreview content={s.content} onOpen={() => setReading(s)} />
-                  <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-                  {canReview && <div className="flex gap-xs pt-xs">
-                    <button
-                      onClick={() => startReject(s)}
-                      className="flex-1 py-1 border border-outline text-primary font-label-sm text-label-sm hover:bg-surface-container transition-colors"
-                    >
-                      REFUSER
-                    </button>
-                    <button
-                      onClick={() => review.mutate({ id: s.id, status: "validée" })}
-                      className="flex-1 py-1 bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 transition-colors"
-                    >
-                      VALIDER
-                    </button>
-                  </div>}
-                </div>
-              ))}
-            </div>
+            <PendingQueue
+              role={role}
+              mode="manager"
+              onPrepareRecap={role === "manager" ? () => setRecapOpen(true) : undefined}
+            />
           </section>
 
           {/* Mes soumissions */}
-          {mine.data && mine.data.length > 0 && (
-            <section className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md">
-              <h2 className="font-headline-sm text-headline-sm text-primary border-b border-outline-variant pb-sm mb-md">
-                Mes soumissions
-              </h2>
-              <div className="space-y-xs">
-                {mine.data.map((s) => (
-                  <div key={s.id} className="p-sm border border-outline-variant bg-card min-w-0 overflow-hidden">
-                    <SubmissionPreview content={s.content} onOpen={() => setReading(s)} />
-                    <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-                    <p className="text-[11px] font-label-sm text-on-surface-variant uppercase mt-xs">
-                      {s.status} • {s.team} • {timeAgo(s.created_at)}
-                    </p>
-                    {s.status === "refusée" && s.rejection_category && (
-                      <div className="mt-xs p-xs bg-error-container text-on-error-container text-body-sm wrap-anywhere">
-                        <p className="font-bold">Motif : {s.rejection_category}</p>
-                        <p className="whitespace-pre-line">Raison : <Linkify text={s.rejection_note ?? ""} /></p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+          <MySubmissions email={myEmail} onRead={setReading} />
 
           <ValidatedSubmissions
             role={role}
@@ -620,7 +502,7 @@ function ManagerSpace() {
           />
 
           {/* Points Bloquants */}
-          <section className="col-span-12 md:col-span-7 bg-surface-container-lowest border border-outline-variant p-md">
+          <section ref={blockersRef} className="col-span-12 md:col-span-7 bg-surface-container-lowest border border-outline-variant p-md">
             <div className="flex items-center justify-between mb-md">
               <div className="flex items-center gap-sm">
                 <h2 className="font-headline-sm text-headline-sm text-primary">Points Bloquants</h2>
@@ -701,7 +583,7 @@ function ManagerSpace() {
           </section>
 
           {/* Performance Hub */}
-          <section className="col-span-12 md:col-span-5 bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
+          <section ref={metricsRef} className="col-span-12 md:col-span-5 bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
             <div className="flex items-center justify-between mb-md">
               <h2 className="font-headline-sm text-headline-sm text-primary">Indicateurs</h2>
               {isAdmin && <Icon name="settings" className="text-on-surface-variant cursor-pointer" />}
@@ -782,122 +664,20 @@ function ManagerSpace() {
       <SubmissionReader
         submission={reading}
         onClose={() => setReading(null)}
-        onReject={reading && canReview && reading.status === "en attente" ? () => startReject(reading) : undefined}
-        onApprove={
-          reading && canReview && reading.status === "en attente"
-            ? () => review.mutate({ id: reading.id, status: "validée" })
-            : undefined
-        }
-        approving={review.isPending}
       />
-      {rejecting && (
-        <Modal title="Refuser la soumission" onClose={() => setRejecting(null)}>
-          <form
-            noValidate
-            className="space-y-sm"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const res = validate(rejectionSchema, rejectForm);
-              if (!res.ok) return setRejectErrors(res.errors);
-              setRejectErrors({});
-              review.mutate({ id: rejecting.id, status: "refusée", ...res.data });
-            }}
-          >
-            <p className="max-h-48 overflow-y-auto border border-outline-variant bg-surface-container-low p-xs text-body-sm italic text-on-surface-variant whitespace-pre-line wrap-anywhere">“{rejecting.content}”</p>
-            <ErrorSummary errors={rejectErrors} />
-            <Field label="Motif du refus" error={rejectErrors.rejection_category}>
-              <select
-                className="w-full border border-outline-variant bg-card p-xs text-body-sm"
-                value={rejectForm.rejection_category}
-                onChange={(e) => setRejectForm({ ...rejectForm, rejection_category: e.target.value })}
-              >
-                <option value="">— Choisir un motif —</option>
-                {REJECTION_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Raison du refus (obligatoire)" error={rejectErrors.rejection_note}>
-              <TextArea
-                rows={4}
-                value={rejectForm.rejection_note}
-                placeholder="Explique au collaborateur pourquoi sa soumission est refusée…"
-                onChange={(e) => setRejectForm({ ...rejectForm, rejection_note: e.target.value })}
-              />
-              <CharCounter value={rejectForm.rejection_note} max={500} />
-            </Field>
-            <FormActions pending={review.isPending} onCancel={() => setRejecting(null)} />
-          </form>
-        </Modal>
+      {submitOpen && (
+        <SubmitModal
+          role={role}
+          email={myEmail}
+          managerTeams={myTeams.data ?? []}
+          onClose={() => setSubmitOpen(false)}
+          onSent={(result) => {
+            setSubmitOpen(false);
+            setSent(result);
+          }}
+        />
       )}
-      {submissionForm && (
-        <Modal title="Soumettre une proposition" onClose={() => setSubmissionForm(null)}>
-          <form onSubmit={sendSubmission} className="space-y-sm" noValidate>
-            <ErrorSummary errors={submissionErrors} />
-            <Field label="Nom" error={submissionErrors.author_name}>
-              <TextInput
-                value={submissionForm.author_name}
-                maxLength={80}
-                placeholder="Ton nom"
-                onChange={(e) => setSubmissionForm({ ...submissionForm, author_name: e.target.value })}
-              />
-            </Field>
-            {role === "manager" && (
-              <Field label="Équipe" error={submissionErrors.team}>
-                <select
-                  required
-                  value={submissionForm.team}
-                  onChange={(e) => setSubmissionForm({ ...submissionForm, team: e.target.value })}
-                  className="w-full border border-outline-variant bg-surface px-sm py-xs font-body-md"
-                >
-                  <option value="">Choisis une de tes équipes</option>
-                  {myTeams.data?.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </Field>
-            )}
-            {role === "admin" && (
-              <p className="text-body-sm text-on-surface-variant">Équipe : Admin</p>
-            )}
-            <Field label="Proposition" error={submissionErrors.content}>
-              <TextArea
-                rows={5}
-                value={submissionForm.content}
-                placeholder="Décris l'amélioration proposée pour le cabinet…"
-                onChange={(e) => setSubmissionForm({ ...submissionForm, content: e.target.value })}
-              />
-              <CharCounter value={submissionForm.content} max={2000} min={5} />
-            </Field>
-            <Field label="Document PDF (optionnel, 20 Mo max)" error={submissionErrors.attachment}>
-              <input
-                type="file"
-                accept="application/pdf,.pdf"
-                className="block w-full text-body-sm"
-                onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null;
-                  if (f && f.type !== "application/pdf") {
-                    setSubmissionErrors({ ...submissionErrors, attachment: "Seuls les fichiers PDF sont acceptés." });
-                    e.target.value = ""; setAttachment(null); return;
-                  }
-                  if (f && f.size > 20 * 1024 * 1024) {
-                    setSubmissionErrors({ ...submissionErrors, attachment: "Le fichier dépasse 20 Mo." });
-                    e.target.value = ""; setAttachment(null); return;
-                  }
-                  const { attachment: _a, ...rest } = submissionErrors;
-                  setSubmissionErrors(rest);
-                  setAttachment(f);
-                }}
-              />
-            </Field>
-            <FormActions
-              pending={submit.isPending}
-              submitLabel="ENVOYER"
-              onCancel={() => setSubmissionForm(null)}
-            />
-          </form>
-        </Modal>
-      )}
+      {role === "manager" && <TeamRecapPanel open={recapOpen} email={myEmail} onClose={() => setRecapOpen(false)} />}
     </div>
   );
 }

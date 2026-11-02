@@ -1,9 +1,9 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BrandHeader } from "@/components/brand-header";
-import { processAttachmentDeletionQueue } from "@/lib/dashboard";
+import { fetchSubmissions, processAttachmentDeletionQueue } from "@/lib/dashboard";
 
 export const Route = createFileRoute("/_authenticated/manage")({
   head: () => ({
@@ -39,6 +39,8 @@ const tabs = [
 
 function ManageLayout() {
   const qc = useQueryClient();
+  const pending = useQuery({ queryKey: ["submissions"], queryFn: fetchSubmissions, retry: false });
+  const pendingBlockers = (pending.data ?? []).filter((s) => s.kind === "point bloquant").length;
   // Suppression silencieuse des pièces jointes échues, une fois par chargement de /manage
   useEffect(() => {
     processAttachmentDeletionQueue()
@@ -70,14 +72,24 @@ function ManageLayout() {
 
         <nav className="flex flex-wrap gap-xs border-b border-outline-variant pb-sm">
           {tabs.map((t) => (
-            <Link
-              key={t.to}
-              to={t.to}
-              className="px-md py-xs border border-outline-variant font-label-md text-label-md text-on-surface-variant hover:bg-surface-container"
-              activeProps={{ className: "bg-primary text-on-primary border-primary" }}
-            >
-              {t.label}
-            </Link>
+            <div key={t.to} className="flex items-stretch">
+              <Link
+                to={t.to}
+                className="px-md py-xs border border-outline-variant font-label-md text-label-md text-on-surface-variant hover:bg-surface-container"
+                activeProps={{ className: "bg-primary text-on-primary border-primary" }}
+              >
+                {t.label}
+              </Link>
+              {t.to === "/manage/blockers" && pendingBlockers > 0 && (
+                <Link
+                  to="/manage/submissions"
+                  aria-label={`${pendingBlockers} point${pendingBlockers > 1 ? "s" : ""} bloquant${pendingBlockers > 1 ? "s" : ""} en attente, voir la liste`}
+                  className="flex items-center bg-tertiary-fixed px-xs font-label-sm text-label-sm text-on-tertiary-fixed"
+                >
+                  {pendingBlockers}
+                </Link>
+              )}
+            </div>
           ))}
         </nav>
 

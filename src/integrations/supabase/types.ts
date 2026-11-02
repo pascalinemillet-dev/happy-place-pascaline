@@ -372,8 +372,15 @@ export type Database = {
           status: Database["public"]["Enums"]["submission_status"]
           submitted_by_email: string | null
           team: string
+          kind: Database["public"]["Enums"]["submission_kind"]
+          severity: Database["public"]["Enums"]["blocker_severity"] | null
+          proposed_title: string | null
+          proposed_title_by_ai: boolean
+          blocker_id: string | null
         }
         Insert: {
+          kind?: Database["public"]["Enums"]["submission_kind"]
+          severity?: Database["public"]["Enums"]["blocker_severity"] | null
           attachment_name?: string | null
           attachment_path?: string | null
           author_name: string
@@ -404,6 +411,11 @@ export type Database = {
           status?: Database["public"]["Enums"]["submission_status"]
           submitted_by_email?: string | null
           team?: string
+          kind?: Database["public"]["Enums"]["submission_kind"]
+          severity?: Database["public"]["Enums"]["blocker_severity"] | null
+          proposed_title?: string | null
+          proposed_title_by_ai?: boolean
+          blocker_id?: string | null
         }
         Relationships: [
           {
@@ -414,6 +426,24 @@ export type Database = {
             referencedColumns: ["name"]
           },
         ]
+      }
+      usage_events: {
+        Row: {
+          created_at: string
+          event: string
+          id: string
+          module: string | null
+          props: Json
+          role: Database["public"]["Enums"]["app_role"] | null
+          user_email: string | null
+        }
+        Insert: {
+          event: string
+          module?: string | null
+          props?: Json
+        }
+        Update: Record<string, never>
+        Relationships: []
       }
       teams: {
         Row: {
@@ -450,6 +480,23 @@ export type Database = {
       }
     }
     Functions: {
+      submission_assignees: {
+        Args: { _team?: string | null }
+        Returns: { full_name: string }[]
+      }
+      publish_blocker_submission: {
+        Args: {
+          _submission_id: string
+          _title: string
+          _department: string
+          _severity: Database["public"]["Enums"]["blocker_severity"]
+        }
+        Returns: string
+      }
+      save_proposed_title: {
+        Args: { _submission_id: string; _title: string | null; _by_ai: boolean }
+        Returns: undefined
+      }
       choisir_mon_role: {
         Args: {
           _first_name: string
@@ -478,6 +525,7 @@ export type Database = {
         | "en désaccord avec les process"
         | "doublon"
         | "autre"
+      submission_kind: "idée" | "point bloquant"
       submission_status: "en attente" | "validée" | "refusée"
     }
     CompositeTypes: {
@@ -616,6 +664,7 @@ export const Constants = {
         "doublon",
         "autre",
       ],
+      submission_kind: ["idée", "point bloquant"],
       submission_status: ["en attente", "validée", "refusée"],
     },
   },

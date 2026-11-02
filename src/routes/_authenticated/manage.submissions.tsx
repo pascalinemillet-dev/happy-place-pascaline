@@ -18,6 +18,7 @@ import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card
 import { Linkify } from "@/components/linkify";
 import { SubmissionReader } from "@/components/submission-reader";
 import { SubmissionHistory } from "@/components/manage/submission-history";
+import { PendingQueue } from "@/components/submissions/pending-queue";
 import { submissionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
 import {
   REJECTION_CATEGORIES,
@@ -109,9 +110,12 @@ function ManageSubmissions() {
 
   return (
     <section className="space-y-md">
+      <div className="bg-surface-container-lowest border border-outline-variant p-md">
+        <PendingQueue role="admin" mode="admin" />
+      </div>
       <div className="flex items-center justify-between">
         <h2 className="font-headline-sm text-headline-sm text-primary">
-          Soumissions ({list.data?.length ?? 0})
+          Toutes les soumissions ({list.data?.length ?? 0})
         </h2>
         <button
           onClick={() => {

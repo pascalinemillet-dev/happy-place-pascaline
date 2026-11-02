@@ -43,7 +43,7 @@ La connexion se fait par email et mot de passe, réservée aux adresses invitée
 1. Dans ton dépôt GitHub, ouvre le dossier **supabase**, puis le fichier **setup.sql**. Clique sur l'icône **Copy raw file** (deux carrés superposés, au-dessus du code à droite).
 2. Dans Supabase : **SQL Editor** → **+ New query**. Colle, puis clique sur **Run**.
 3. Si Supabase te demande comment gérer la sécurité des tables (RLS), choisis **Run without RLS** : le script active lui-même les règles de sécurité sur toutes les tables. Si un avertissement parle de « destructive operations », clique sur **Run this query**.
-4. Un tableau de 13 lignes apparaît : **toutes les lignes doivent indiquer `ok = true`**.
+4. Un tableau de 25 lignes apparaît : **toutes les lignes doivent indiquer `ok = true`**.
 5. Fais de même avec **seed.sql** (les données de démo), dans une **nouvelle** requête. Résultat attendu : « Success. No rows returned ».
 
 > Tu peux relancer `seed.sql` à tout moment pour remettre les contenus de démo dans leur état de départ. Les profils créés sont conservés.
@@ -99,6 +99,12 @@ La base contient aussi dix membres fictifs de Bigger Boat (`@biggerboat.example`
 - **Règles du projet** : le fichier `AGENTS.md` liste les conventions à respecter. Donne-le à ton assistant IA de code.
 - **Tâches automatiques** : deux tâches tournent chaque nuit dans Supabase (revalidation annuelle des contenus, départs programmés des collaborateurs). Tu les retrouves dans le module **Cron** de Supabase.
 - **Mise en ligne** : l'app est déployée sur Cloudflare Workers, branché sur ce dépôt GitHub (Workers Builds) : chaque envoi sur `main` redéploie l'app. Le build Nitro détecte Cloudflare tout seul (preset `cloudflare_module`) et complète `wrangler.jsonc`. Dans Cloudflare, `VITE_SUPABASE_URL` et `VITE_SUPABASE_PUBLISHABLE_KEY` se saisissent en **variables de build**, car Vite les intègre au moment du build.
+
+## F1 « Signaler un point bloquant » (lot 1)
+
+- **Base déjà installée** : dans Supabase, **SQL Editor** → **+ New query**, colle le contenu de `supabase/migrations/20261031090000_f1_point_bloquant.sql`, puis **Run**. Lance ensuite `select * from private.run_smoke_tests();` : 25 lignes, toutes à `ok = true`. Sur un projet neuf, `setup.sql` contient déjà F1.
+- **IA (titre US31 et récap US64)** : le Worker Cloudflare lit les données sous l'identité de l'utilisateur, puis appelle le scénario Make « HappyPlace - IA », qui appelle OpenAI. Dans Cloudflare (Workers → `happy-place-pascaline` → Settings → Variables and Secrets), ajoute en **Secret** `MAKE_AI_WEBHOOK_URL` (adresse du webhook Make) et `MAKE_AI_SECRET` (chaîne que le scénario vérifie dans l'en-tête `x-happyplace-secret`). Sans ces secrets, l'app marche sans IA : titre saisi à la main, récap en tableau.
+- **Scénario Make attendu** : webhook personnalisé → filtre sur l'en-tête `x-happyplace-secret` → OpenAI « Create a Chat Completion » (message système = `consigne`, message utilisateur = `texte`, format JSON si `format_json` vaut `true`) → **Webhook response** avec, pour corps, le texte renvoyé par OpenAI.
 
 ## En cas de problème
 

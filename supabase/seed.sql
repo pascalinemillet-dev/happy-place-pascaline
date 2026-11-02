@@ -105,6 +105,12 @@ UPDATE public.submissions
        rejection_note = 'La politique de rémunération est fixée au niveau de la direction.'
  WHERE content = 'Prime trimestrielle par équipe plutôt qu’individuelle.';
 
+-- F1 : points bloquants en attente de publication (sévérité choisie par l'auteur)
+INSERT INTO public.submissions (author_name, team, content, status, kind, severity, created_at) VALUES
+('Thomas Diallo', 'Direction Commerciale', 'Depuis la migration vers le nouvel ATS, les CV n’apparaissent plus dans les fiches candidats importées. Je dois les redemander aux candidats avant chaque présentation client.', 'en attente', 'point bloquant', 'critical', now() - interval '2 hours'),
+('Nina Petit', 'Product', 'Nous n’avons plus aucun profil DevSecOps à présenter sur les mandats en cours depuis trois semaines.', 'en attente', 'point bloquant', 'warning', now() - interval '1 day'),
+('Hugo Martin', 'People', 'Le partage d’écran plante pendant les entretiens visio avec les candidats.', 'en attente', 'point bloquant', 'warning', now() - interval '3 days');
+
 -- 5. Points bloquants
 INSERT INTO public.blockers (title, description, department, severity, status, created_at, updated_at) VALUES
 ('Pénurie de profils DevSecOps seniors', 'Trois mandats prioritaires ouverts depuis plus de 30 jours avec peu de candidats disponibles en Île-de-France.', 'CLOUD & CYBERSÉCURITÉ', 'critical', 'EN COURS', now() - interval '17 days', now() - interval '17 days'),
