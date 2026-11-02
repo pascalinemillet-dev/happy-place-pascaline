@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { signOut } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { BrandHeader } from "@/components/brand-header";
 import { SubmissionReader } from "@/components/submission-reader";
@@ -98,6 +98,22 @@ function ManagerSpace() {
   const canWriteNews = canReview;
   const myEmail = (email ?? "").toLowerCase();
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
+
+  // Liens des e-mails (US61, US65) : #mes-soumissions ou #points-bloquants.
+  // Les blocs s'affichent après le chargement des données : on attend qu'ils existent.
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (!id) return;
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      const el = document.getElementById(id);
+      if (el || ++tries > 20) {
+        window.clearInterval(timer);
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, []);
   const myName =
     (typeof meta.full_name === "string" && meta.full_name) ||
     (typeof meta.name === "string" && meta.name) ||
@@ -503,7 +519,7 @@ function ManagerSpace() {
           />
 
           {/* Points Bloquants */}
-          <section ref={blockersRef} className="col-span-12 md:col-span-7 bg-surface-container-lowest border border-outline-variant p-md">
+          <section id="points-bloquants" ref={blockersRef} className="col-span-12 md:col-span-7 bg-surface-container-lowest border border-outline-variant p-md">
             <div className="flex items-center justify-between mb-md">
               <div className="flex items-center gap-sm">
                 <h2 className="font-headline-sm text-headline-sm text-primary">Points Bloquants</h2>

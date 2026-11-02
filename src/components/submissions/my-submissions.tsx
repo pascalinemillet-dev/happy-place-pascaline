@@ -57,6 +57,7 @@ export function MySubmissions({
 
   return (
     <section
+      id="mes-soumissions"
       ref={ref}
       className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md"
     >

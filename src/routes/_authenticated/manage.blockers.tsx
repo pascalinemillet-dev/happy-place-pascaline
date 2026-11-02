@@ -61,7 +61,7 @@ function ManageBlockers() {
   const [toDelete, setToDelete] = useState<Blocker | null>(null);
 
   const list = useQuery({ queryKey: ["blockers", "all"], queryFn: fetchAllBlockers, retry: false });
-  const teams = useQuery({ queryKey: ["teams"], queryFn: fetchTeamNames, retry: false });
+  const teams = useQuery({ queryKey: ["teams", "names"], queryFn: fetchTeamNames, retry: false });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["blockers"] });
   const onError = (e: unknown) => toast.error((e as Error).message);
 

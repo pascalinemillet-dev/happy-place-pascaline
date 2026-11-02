@@ -78,7 +78,7 @@ export function PendingQueue({
     retry: false,
   });
   const teams = useQuery({
-    queryKey: ["teams"],
+    queryKey: ["teams", "names"],
     queryFn: fetchTeamNames,
     enabled: canReview,
     retry: false,
