@@ -14,6 +14,7 @@ import {
   type MySubmission,
 } from "@/lib/f1";
 import { useModuleViewed } from "@/lib/use-module-viewed";
+import { ModuleHint, hintId } from "@/components/module-hint";
 
 function statusBadge(s: MySubmission): { label: string; className: string } {
   if (s.status === "refusée")
@@ -59,10 +60,14 @@ export function MySubmissions({
     <section
       id="mes-soumissions"
       ref={ref}
+      aria-describedby={hintId("mes-soumissions")}
       className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md"
     >
       <div className="flex flex-wrap items-center justify-between gap-sm border-b border-outline-variant pb-sm mb-md">
-        <h2 className="font-headline-sm text-headline-sm text-primary">Mes soumissions</h2>
+        <div>
+          <h2 className="font-headline-sm text-headline-sm text-primary">Mes soumissions</h2>
+          <ModuleHint module="mes-soumissions" />
+        </div>
         <label className="flex items-center gap-xs font-label-sm text-label-sm text-on-surface-variant uppercase">
           Type
           <select

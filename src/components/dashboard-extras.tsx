@@ -6,6 +6,7 @@ import { SubmissionPreview, formatExactDate } from "@/components/expandable-card
 import { fetchResolvedBlockers, fetchValidatedSubmissions, type Submission } from "@/lib/dashboard";
 import { trackEvent } from "@/lib/f1";
 import { useModuleViewed } from "@/lib/use-module-viewed";
+import { ModuleHint, hintId } from "@/components/module-hint";
 
 /** Fenêtre « Archive des points bloquants » (lecture seule, statut RÉSOLU). */
 export function BlockerArchive({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -89,9 +90,16 @@ export function ValidatedSubmissions({
   const shown = filtered.slice(0, limit);
 
   return (
-    <section ref={ref} className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md">
+    <section
+      ref={ref}
+      aria-describedby={hintId("idees-validees")}
+      className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md"
+    >
       <div className="flex flex-wrap items-center justify-between gap-sm border-b border-outline-variant pb-sm mb-md">
-        <h2 className="font-headline-sm text-headline-sm text-primary">Idées validées</h2>
+        <div>
+          <h2 className="font-headline-sm text-headline-sm text-primary">Idées validées</h2>
+          <ModuleHint module="idees-validees" />
+        </div>
         <label className="flex items-center gap-xs font-label-sm text-label-sm text-on-surface-variant min-w-0">
           <span className="sr-only">Filtrer par équipe</span>
           <select

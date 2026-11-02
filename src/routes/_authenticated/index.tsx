@@ -16,6 +16,7 @@ import { MySubmissions } from "@/components/submissions/my-submissions";
 import { SubmitModal, type SentSubmission } from "@/components/submissions/submit-modal";
 import { TeamRecapPanel } from "@/components/submissions/team-recap-panel";
 import { useModuleViewed } from "@/lib/use-module-viewed";
+import { ModuleHint, hintId } from "@/components/module-hint";
 import { Button } from "@/components/ui/button";
 import {
   fetchBlockers,
@@ -254,10 +255,12 @@ function ManagerSpace() {
                 setSent(null);
                 setSubmitOpen(true);
               }}
+              aria-describedby={hintId("soumettre")}
               className="flex items-center gap-xs px-md py-xs bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 transition-all shadow-sm"
             >
               <Icon name="add" /> SOUMETTRE
             </button>
+            <ModuleHint module="soumettre" />
           </div>
           <div className="flex flex-wrap gap-xs items-center md:items-end md:justify-end">
             <span className="font-label-sm text-label-sm text-on-surface-variant">
@@ -315,14 +318,21 @@ function ManagerSpace() {
 
         <div className="bento-grid">
           {/* News Management & Input */}
-          <section ref={newsRef} className="col-span-12 lg:col-span-8 bg-surface-container-lowest border border-outline-variant p-md flex flex-col gap-md">
-            <div className="flex items-center justify-between border-b border-outline-variant pb-sm">
-              <h2 className="font-headline-sm text-headline-sm text-primary">
-                Actualités du cabinet
-              </h2>
-              <span className="font-label-sm text-label-sm text-on-surface-variant">
-                {drafts} brouillon{drafts > 1 ? "s" : ""} en attente
-              </span>
+          <section
+            ref={newsRef}
+            aria-describedby={hintId("actus")}
+            className="col-span-12 lg:col-span-8 bg-surface-container-lowest border border-outline-variant p-md flex flex-col gap-md"
+          >
+            <div className="border-b border-outline-variant pb-sm">
+              <div className="flex items-center justify-between">
+                <h2 className="font-headline-sm text-headline-sm text-primary">
+                  Actualités du cabinet
+                </h2>
+                <span className="font-label-sm text-label-sm text-on-surface-variant">
+                  {drafts} brouillon{drafts > 1 ? "s" : ""} en attente
+                </span>
+              </div>
+              <ModuleHint module="actus" />
             </div>
             {canWriteNews && <form
               className="space-y-md"
@@ -537,8 +547,13 @@ function ManagerSpace() {
           />
 
           {/* Points Bloquants */}
-          <section id="points-bloquants" ref={blockersRef} className="col-span-12 md:col-span-7 bg-surface-container-lowest border border-outline-variant p-md">
-            <div className="flex items-center justify-between mb-md">
+          <section
+            id="points-bloquants"
+            ref={blockersRef}
+            aria-describedby={hintId("points-bloquants")}
+            className="col-span-12 md:col-span-7 bg-surface-container-lowest border border-outline-variant p-md"
+          >
+            <div className="flex items-center justify-between mb-xs">
               <div className="flex items-center gap-sm">
                 <h2 className="font-headline-sm text-headline-sm text-primary">Points Bloquants</h2>
                 <span className="text-xs bg-error-container text-on-error-container px-xs py-1 font-label-sm">
@@ -554,6 +569,7 @@ function ManagerSpace() {
                  VOIR L'ARCHIVE
               </button>
             </div>
+            <ModuleHint module="points-bloquants" className="mb-md" />
             <div className="space-y-sm">
               {blockers.isError && (
                 <p className="text-body-sm text-error">
@@ -618,11 +634,16 @@ function ManagerSpace() {
           </section>
 
           {/* Performance Hub */}
-          <section ref={metricsRef} className="col-span-12 md:col-span-5 bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
-            <div className="flex items-center justify-between mb-md">
+          <section
+            ref={metricsRef}
+            aria-describedby={hintId("indicateurs")}
+            className="col-span-12 md:col-span-5 bg-surface-container-lowest border border-outline-variant p-md flex flex-col"
+          >
+            <div className="flex items-center justify-between mb-xs">
               <h2 className="font-headline-sm text-headline-sm text-primary">Indicateurs</h2>
               {isAdmin && <Icon name="settings" className="text-on-surface-variant cursor-pointer" />}
             </div>
+            <ModuleHint module="indicateurs" className="mb-md" />
             <div className="grid grid-cols-2 gap-sm mb-md">
               <MetricCard m={metricOf(metrics.data, "taux_placement")} fallback="Taux de placement" />
               <MetricCard m={metricOf(metrics.data, "missions_actives")} fallback="Missions actives" />
@@ -696,6 +717,7 @@ function ManagerSpace() {
               />
             </div>
           </section>
+
         </div>
       </main>
       <BlockerArchive open={archiveOpen} onClose={() => setArchiveOpen(false)} />

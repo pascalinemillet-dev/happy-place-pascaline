@@ -28,6 +28,7 @@ import {
 } from "@/lib/f1";
 import { suggestBlockerTitle } from "@/lib/ai.functions";
 import { isLate } from "@/lib/recap";
+import { ModuleHint } from "@/components/module-hint";
 
 const FILTERS: { value: QueueFilter; label: string }[] = [
   { value: "tous", label: "TOUS" },
@@ -107,7 +108,10 @@ export function PendingQueue({
 
   const heading = (
     <div className="flex flex-wrap items-center justify-between gap-xs border-b border-outline-variant pb-sm mb-md">
-      <h2 className="font-headline-sm text-headline-sm text-primary">Soumissions en attente</h2>
+      <div>
+        <h2 className="font-headline-sm text-headline-sm text-primary">Soumissions en attente</h2>
+        {canReview && <ModuleHint module="soumissions-en-attente" />}
+      </div>
       <p
         className="font-label-sm text-label-sm text-on-surface-variant uppercase"
         aria-live="polite"
