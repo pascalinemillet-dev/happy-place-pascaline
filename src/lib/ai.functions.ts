@@ -78,7 +78,10 @@ async function askAi(
     } catch {
       // Make peut renvoyer le texte brut : on le garde tel quel.
     }
-    return typeof reponse === "string" && reponse.trim() ? reponse.trim() : null;
+    // Make répond « Accepted » quand le scénario est arrêté ou que le filtre a bloqué l'appel :
+    // ce n'est pas une réponse de l'IA.
+    if (typeof reponse !== "string" || !reponse.trim() || reponse.trim() === "Accepted") return null;
+    return reponse.trim();
   } catch (e) {
     console.error("[make-ia]", tache, (e as Error).name);
     return null;
