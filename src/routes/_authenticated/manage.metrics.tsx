@@ -14,11 +14,14 @@ import {
 import { metricSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
 import { MetricHistory } from "@/components/manage/metric-history";
 import {
+  comparedText,
   createMetric,
+  dateFr,
   deleteMetric,
   fetchMetrics,
   deltaText,
   formatMetricValue,
+  periodText,
   updateMetricRow,
   TREND_LABELS,
   type Metric,
@@ -39,9 +42,25 @@ export const Route = createFileRoute("/_authenticated/manage/metrics")({
   component: ManageMetrics,
 });
 
-type FormState = { key: string; label: string; value: string; unit: string };
+type FormState = {
+  key: string;
+  label: string;
+  value: string;
+  unit: string;
+  comptage: boolean;
+  period_start: string;
+  period_end: string;
+};
 
-const empty: FormState = { key: "", label: "", value: "", unit: "" };
+const empty: FormState = {
+  key: "",
+  label: "",
+  value: "",
+  unit: "",
+  comptage: false,
+  period_start: "",
+  period_end: "",
+};
 
 function ManageMetrics() {
   const qc = useQueryClient();
@@ -90,6 +109,9 @@ function ManageMetrics() {
       label: form.label,
       value: raw === "" || Number.isNaN(Number(raw)) ? Number.NaN : Number(raw),
       unit: form.unit.trim() === "" ? null : form.unit,
+      comptage: form.comptage,
+      period_start: form.period_start,
+      period_end: form.period_end,
     };
     const res = validate(metricSchema, candidate);
     if (!res.ok) {
@@ -131,18 +153,23 @@ function ManageMetrics() {
           >
             <div className="min-w-0 [overflow-wrap:anywhere]">
               <p className="font-body-md text-primary font-bold">
-                {m.label} — {formatMetricValue(m.value, m.unit)}
+                {m.label} — {formatMetricValue(m.value, m.unit, m.comptage)}
               </p>
               <p className="text-[11px] font-label-sm text-on-surface-variant mt-xs">
+                Période : {periodText(m.period_start, m.period_end)} · Mis à jour le{" "}
+                {dateFr(m.updated_at)}
+              </p>
+              <p className="text-[11px] font-label-sm text-on-surface-variant">
                 {m.key} • {TREND_LABELS[m.trend]}
                 {m.previous_value != null && (
                   <>
                     {deltaText(m) && ` · ${deltaText(m)}`}
-                    {` · avant : ${formatMetricValue(m.previous_value, m.unit).replace(/%$/, " %")}`}
+                    {` · avant : ${formatMetricValue(m.previous_value, m.unit, m.comptage).replace(/%$/, " %")}`}
+                    {comparedText(m) && ` (${comparedText(m).replace("par rapport à la ", "")})`}
                   </>
                 )}
               </p>
-              <MetricHistory metricKey={m.key} unit={m.unit} />
+              <MetricHistory metricKey={m.key} unit={m.unit} comptage={m.comptage} />
             </div>
             <RowActions
               onEdit={() => {
@@ -153,6 +180,9 @@ function ManageMetrics() {
                   label: m.label,
                   value: String(m.value),
                   unit: m.unit ?? "",
+                  comptage: m.comptage,
+                  period_start: m.period_start ?? "",
+                  period_end: m.period_end ?? "",
                 });
               }}
               onDelete={() => setToDelete(m)}
@@ -199,6 +229,35 @@ function ManageMetrics() {
                 onChange={(e) => setForm({ ...form, unit: e.target.value })}
               />
             </Field>
+            <label className="flex items-center gap-xs text-body-sm text-primary">
+              <input
+                type="checkbox"
+                checked={form.comptage}
+                onChange={(e) => setForm({ ...form, comptage: e.target.checked })}
+              />
+              Comptage (nombre entier, sans décimale)
+            </label>
+            <div className="grid grid-cols-2 gap-sm">
+              <Field label="Période : début" error={errors.period_start}>
+                <TextInput
+                  type="date"
+                  required
+                  value={form.period_start}
+                  onChange={(e) => setForm({ ...form, period_start: e.target.value })}
+                />
+              </Field>
+              <Field label="Période : fin" error={errors.period_end}>
+                <TextInput
+                  type="date"
+                  required
+                  value={form.period_end}
+                  onChange={(e) => setForm({ ...form, period_end: e.target.value })}
+                />
+              </Field>
+            </div>
+            <p className="text-[11px] text-on-surface-variant">
+              La période de calcul est obligatoire : elle s'affiche sur la carte de l'indicateur.
+            </p>
             <FormActions pending={save.isPending} onCancel={close} />
           </form>
         </Modal>

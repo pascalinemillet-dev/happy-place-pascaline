@@ -122,28 +122,39 @@ INSERT INTO public.blockers (title, description, department, severity, status, c
 UPDATE public.blockers SET status = 'RÉSOLU' WHERE title = 'Import des candidatures dans l’ATS';
 
 -- 6. Indicateurs (l'historique d'abord, puis la valeur actuelle)
-INSERT INTO public.metrics_history (metric_key, value, recorded_at) VALUES
-('training_kpi', 38.6, now() - interval '12 days'),
-('active_users', 42,   now() - interval '12 days'),
-('active_users', 45,   now() - interval '8 days'),
-('nps',          71,   now() - interval '12 days'),
-('nps',          72,   now() - interval '8 days'),
-('engagement',   84.3, now() - interval '12 days'),
-('turnover',     31,   now() - interval '12 days'),
-('absenteeism',  27.8, now() - interval '12 days'),
-('open_positions', 63, now() - interval '12 days'),
-('training_hours', 186, now() - interval '12 days');
+-- Clés alignées sur les libellés (US42). Période de calcul (US41, valeurs fictives) :
+-- le mois civil qui précède chaque saisie.
+INSERT INTO public.metrics_history (metric_key, value, recorded_at, period_start, period_end)
+SELECT k, v, t,
+       date_trunc('month', t - interval '1 month')::date,
+       (date_trunc('month', t) - interval '1 day')::date
+  FROM (VALUES
+    ('taux_placement',          38.6, now() - interval '12 days'),
+    ('missions_actives',        42,   now() - interval '12 days'),
+    ('missions_actives',        45,   now() - interval '8 days'),
+    ('nps_candidats',           71,   now() - interval '12 days'),
+    ('nps_candidats',           72,   now() - interval '8 days'),
+    ('taux_acceptation',        84.3, now() - interval '12 days'),
+    ('delai_moyen_recrutement', 31,   now() - interval '12 days'),
+    ('taux_reponse_candidats',  27.8, now() - interval '12 days'),
+    ('postes_ouverts',          63,   now() - interval '12 days'),
+    ('entretiens_realises',     186,  now() - interval '12 days')) AS h(k, v, t);
 
--- Indicateurs mis à jour il y a 8 jours (taux de placement, missions, NPS) ou 12 jours (les autres)
-INSERT INTO public.metrics (key, label, value, unit, updated_at) VALUES
-('training_kpi',   'Taux de placement',           40.6, '%', now() - interval '8 days'),
-('active_users',   'Missions actives',            34.2, NULL, now() - interval '8 days'),
-('nps',            'NPS candidats',               71,   NULL, now() - interval '8 days'),
-('engagement',     'Taux d’acceptation',          84.3, '%', now() - interval '12 days'),
-('turnover',       'Délai moyen de recrutement',  31,   'j', now() - interval '12 days'),
-('absenteeism',    'Taux de réponse candidats',   27.8, '%', now() - interval '12 days'),
-('open_positions', 'Postes ouverts',              63,   NULL, now() - interval '12 days'),
-('training_hours', 'Entretiens réalisés',         186,  NULL, now() - interval '12 days');
+-- Indicateurs mis à jour il y a 8 jours (taux de placement, missions, NPS) ou 12 jours (les autres).
+-- Missions actives est un comptage : valeur entière (C3, la V1 affichait 34,2).
+INSERT INTO public.metrics (key, label, value, unit, updated_at, comptage, period_start, period_end)
+SELECT k, l, v, u, t, c,
+       date_trunc('month', t - interval '1 month')::date,
+       (date_trunc('month', t) - interval '1 day')::date
+  FROM (VALUES
+    ('taux_placement',          'Taux de placement',           40.6, '%',  now() - interval '8 days',  false),
+    ('missions_actives',        'Missions actives',            34,   NULL, now() - interval '8 days',  true),
+    ('nps_candidats',           'NPS candidats',               71,   NULL, now() - interval '8 days',  false),
+    ('taux_acceptation',        'Taux d’acceptation',          84.3, '%',  now() - interval '12 days', false),
+    ('delai_moyen_recrutement', 'Délai moyen de recrutement',  31,   'j',  now() - interval '12 days', false),
+    ('taux_reponse_candidats',  'Taux de réponse candidats',   27.8, '%',  now() - interval '12 days', false),
+    ('postes_ouverts',          'Postes ouverts',              63,   NULL, now() - interval '12 days', true),
+    ('entretiens_realises',     'Entretiens réalisés',         186,  NULL, now() - interval '12 days', true)) AS m(k, l, v, u, t, c);
 
 -- Le trigger d'historique a ajouté une ligne datée d'aujourd'hui : on la recale
 -- sur la date de mise à jour, et on retire les doublons de valeur inchangée.

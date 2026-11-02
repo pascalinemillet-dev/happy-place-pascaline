@@ -1,10 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { fetchMetricHistory, formatMetricValue } from "@/lib/dashboard";
+import { fetchMetricHistory, formatMetricValue, periodText } from "@/lib/dashboard";
 
 const fmt = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
 
-export function MetricHistory({ metricKey, unit }: { metricKey: string; unit: string | null }) {
+export function MetricHistory({
+  metricKey,
+  unit,
+  comptage = false,
+}: {
+  metricKey: string;
+  unit: string | null;
+  comptage?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const q = useQuery({
     queryKey: ["metrics", "history", metricKey],
@@ -32,7 +40,9 @@ export function MetricHistory({ metricKey, unit }: { metricKey: string; unit: st
             <p key={h.id} className="text-body-sm text-on-surface-variant">
               <span className="font-bold text-primary">{fmt.format(new Date(h.recorded_at))}</span>
               {" — "}
-              {formatMetricValue(h.value, unit)}
+              {formatMetricValue(h.value, unit, comptage)}
+              {" · "}
+              {periodText(h.period_start, h.period_end)}
             </p>
           ))}
         </div>

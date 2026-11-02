@@ -21,6 +21,10 @@ import {
   fetchBlockers,
   fetchMetrics,
   deltaText,
+  comparedText,
+  dateFr,
+  formatMetricValue,
+  periodText,
   fetchNews,
   exportMyRecentSubmissions,
   type News,
@@ -76,18 +80,30 @@ function metricOf(metrics: Metric[] | undefined, key: string) {
   return metrics?.find((m) => m.key === key);
 }
 
-function formatMetric(m: Metric | undefined, fallback: string) {
-  if (!m) return fallback;
-  const v = Number(m.value);
-  const formatted = m.unit === "%" ? v.toFixed(1) : v.toLocaleString("fr-FR");
-  return `${formatted}${m.unit ?? ""}`;
-}
-
-function metricLabel(metric: Metric | undefined, fallback: string) {
-  if (!metric) return fallback;
-  if (metric.key === "training_kpi") return "Taux de placement";
-  if (metric.key === "active_users") return "Missions actives";
-  return metric.label;
+/** Carte d'indicateur (US40) : valeur, période de calcul, écart et saisie comparée, date de mise à jour. */
+function MetricCard({ m, fallback }: { m: Metric | undefined; fallback: string }) {
+  const trend = m ? [trendText(m), deltaText(m), comparedText(m)].filter(Boolean).join(" · ") : "";
+  return (
+    <div className="p-sm bg-card border border-outline-variant text-center">
+      <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
+        {m?.label ?? fallback}
+      </p>
+      <p className="font-display text-[32px] text-primary">
+        {m ? formatMetricValue(m.value, m.unit, m.comptage) : "—"}
+      </p>
+      {m && (
+        <>
+          <p className="text-[11px] text-primary font-label-sm">
+            Période : {periodText(m.period_start, m.period_end)}
+          </p>
+          {trend && <p className="text-[10px] text-on-surface-variant font-label-sm">{trend}</p>}
+          <p className="text-[10px] text-on-surface-variant font-label-sm">
+            Mis à jour le {dateFr(m.updated_at)}
+          </p>
+        </>
+      )}
+    </div>
+  );
 }
 
 function ManagerSpace() {
@@ -125,6 +141,8 @@ function ManagerSpace() {
   const [showLinkErrs, setShowLinkErrs] = useState(false);
   const newsLinkErrs = showLinkErrs ? linkErrors(media.links) : {};
   const [nps, setNps] = useState<string>("");
+  const [npsStart, setNpsStart] = useState<string>("");
+  const [npsEnd, setNpsEnd] = useState<string>("");
   const [submitOpen, setSubmitOpen] = useState(false);
   const [sent, setSent] = useState<SentSubmission | null>(null);
   const [recapOpen, setRecapOpen] = useState(false);
@@ -217,7 +235,7 @@ function ManagerSpace() {
   const visibleDrafts = news.data?.filter((n) => n.status === "brouillon") ?? [];
   const drafts = visibleDrafts.length;
   const published = news.data?.filter((n) => n.status === "publiée") ?? [];
-  const npsMetric = metricOf(metrics.data, "nps");
+  const npsMetric = metricOf(metrics.data, "nps_candidats");
   const roleLabel = role === "admin" ? "ADMIN" : role === "manager" ? "MANAGER" : "COLLABORATEUR";
 
   return (
@@ -606,32 +624,8 @@ function ManagerSpace() {
               {isAdmin && <Icon name="settings" className="text-on-surface-variant cursor-pointer" />}
             </div>
             <div className="grid grid-cols-2 gap-sm mb-md">
-              <div className="p-sm bg-card border border-outline-variant text-center">
-                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-                  {metricLabel(metricOf(metrics.data, "training_kpi"), "Taux de placement")}
-                </p>
-                <p className="font-display text-[32px] text-primary">
-                  {formatMetric(metricOf(metrics.data, "training_kpi"), "—")}
-                </p>
-                <p className="text-[10px] text-on-surface-variant font-label-sm">
-                  {trendText(metricOf(metrics.data, "training_kpi"))}
-                  {deltaText(metricOf(metrics.data, "training_kpi")) &&
-                    ` · ${deltaText(metricOf(metrics.data, "training_kpi"))}`}
-                </p>
-              </div>
-              <div className="p-sm bg-card border border-outline-variant text-center">
-                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-                  {metricLabel(metricOf(metrics.data, "active_users"), "Missions actives")}
-                </p>
-                <p className="font-display text-[32px] text-primary">
-                  {formatMetric(metricOf(metrics.data, "active_users"), "—")}
-                </p>
-                <p className="text-[10px] text-on-surface-variant font-label-sm">
-                  {trendText(metricOf(metrics.data, "active_users"))}
-                  {deltaText(metricOf(metrics.data, "active_users")) &&
-                    ` · ${deltaText(metricOf(metrics.data, "active_users"))}`}
-                </p>
-              </div>
+              <MetricCard m={metricOf(metrics.data, "taux_placement")} fallback="Taux de placement" />
+              <MetricCard m={metricOf(metrics.data, "missions_actives")} fallback="Missions actives" />
             </div>
             {isAdmin && <div className="space-y-xs">
               <label className="font-label-sm text-label-sm text-on-surface-variant block">
@@ -647,21 +641,49 @@ function ManagerSpace() {
                 <button
                   onClick={() =>
                     saveMetric.mutate({
-                      key: "nps",
+                      key: "nps_candidats",
                       value: Number(nps !== "" ? nps : (npsMetric?.value ?? 0)),
+                      period_start: npsStart || (npsMetric?.period_start ?? ""),
+                      period_end: npsEnd || (npsMetric?.period_end ?? ""),
                     })
                   }
-                  disabled={saveMetric.isPending}
+                  disabled={
+                    saveMetric.isPending ||
+                    !(npsStart || npsMetric?.period_start) ||
+                    !(npsEnd || npsMetric?.period_end)
+                  }
                   className="bg-primary text-on-primary px-sm font-label-md text-label-md disabled:opacity-50"
                 >
                   METTRE À JOUR
                 </button>
               </div>
+              <div className="grid grid-cols-2 gap-xs">
+                <label className="text-[10px] font-label-sm text-on-surface-variant">
+                  PÉRIODE : DÉBUT
+                  <input
+                    type="date"
+                    required
+                    className="block w-full bg-card border border-outline-variant p-xs font-label-md focus:outline-none focus:border-primary"
+                    value={npsStart || (npsMetric?.period_start ?? "")}
+                    onChange={(e) => setNpsStart(e.target.value)}
+                  />
+                </label>
+                <label className="text-[10px] font-label-sm text-on-surface-variant">
+                  PÉRIODE : FIN
+                  <input
+                    type="date"
+                    required
+                    className="block w-full bg-card border border-outline-variant p-xs font-label-md focus:outline-none focus:border-primary"
+                    value={npsEnd || (npsMetric?.period_end ?? "")}
+                    onChange={(e) => setNpsEnd(e.target.value)}
+                  />
+                </label>
+              </div>
               <p className="text-[10px] text-on-surface-variant italic">
                 {npsMetric
-                  ? `Tendance : ${trendText(npsMetric)}${
+                  ? `Période : ${periodText(npsMetric.period_start, npsMetric.period_end)} · Tendance : ${trendText(npsMetric)}${
                       deltaText(npsMetric) ? ` · ${deltaText(npsMetric)}` : ""
-                    }`
+                    }${comparedText(npsMetric) ? ` ${comparedText(npsMetric)}` : ""}`
                   : "Mis à jour à partir des retours candidats."}
               </p>
             </div>}

@@ -71,10 +71,45 @@ export type Metric = {
   label: string;
   value: number;
   unit: string | null;
+  updated_at: string;
   trend: "hausse" | "baisse" | "stable";
   previous_value: number | null;
   delta: number | string | null;
+  comptage: boolean;
+  period_start: string | null;
+  period_end: string | null;
+  previous_recorded_at: string | null;
+  previous_period_start: string | null;
+  previous_period_end: string | null;
 };
+
+const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
+  "septembre", "octobre", "novembre", "décembre"];
+
+/** Date ISO (AAAA-MM-JJ ou horodatage) en JJ/MM/AAAA, sans décalage de fuseau pour une date seule. */
+export function dateFr(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  if (iso.length > 10) {
+    return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeZone: "Europe/Paris" }).format(new Date(iso));
+  }
+  return `${d}/${m}/${y}`;
+}
+
+/** Période de calcul (US40) : « septembre 2026 » pour un mois entier, sinon « du 01/09/2026 au 15/09/2026 ». */
+export function periodText(start: string | null, end: string | null): string {
+  if (!start || !end) return "Période non renseignée";
+  const [ys, ms, ds] = start.split("-").map(Number);
+  const [ye, me, de] = end.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(ye, me, 0)).getUTCDate();
+  if (ys === ye && ms === me && ds === 1 && de === lastDay) return `${MOIS[ms - 1]} ${ys}`;
+  return `du ${dateFr(start)} au ${dateFr(end)}`;
+}
+
+/** Saisie comparée par l'écart (US40) : « par rapport à la saisie du 21/10 ». */
+export function comparedText(m: Pick<Metric, "previous_recorded_at">): string {
+  if (!m.previous_recorded_at) return "";
+  return `par rapport à la saisie du ${dateFr(m.previous_recorded_at).slice(0, 5)}`;
+}
 
 export const TREND_LABELS: Record<Metric["trend"], string> = {
   hausse: "▲ En hausse",
@@ -92,10 +127,10 @@ export function deltaText(m: Pick<Metric, "delta" | "unit"> | undefined): string
   return `${sign}${abs}${suffix}`;
 }
 
-export function formatMetricValue(value: number | string, unit: string | null): string {
+export function formatMetricValue(value: number | string, unit: string | null, comptage = false): string {
   const formatted = Number(value).toLocaleString("fr-FR", {
-    minimumFractionDigits: unit === "%" ? 1 : 0,
-    maximumFractionDigits: 1,
+    minimumFractionDigits: !comptage && unit === "%" ? 1 : 0,
+    maximumFractionDigits: comptage ? 0 : 1,
   });
   return `${formatted}${unit ?? ""}`;
 }
@@ -297,10 +332,20 @@ export async function fetchMetrics(): Promise<Metric[]> {
   return (data ?? []) as Metric[];
 }
 
-export async function updateMetric(input: { key: string; value: number }) {
+export async function updateMetric(input: {
+  key: string;
+  value: number;
+  period_start: string;
+  period_end: string;
+}) {
   const { error } = await db
     .from("metrics")
-    .update({ value: input.value, updated_at: new Date().toISOString() })
+    .update({
+      value: input.value,
+      period_start: input.period_start,
+      period_end: input.period_end,
+      updated_at: new Date().toISOString(),
+    })
     .eq("key", input.key);
   if (error) throw error;
 }
@@ -341,6 +386,9 @@ export type MetricInput = {
   label: string;
   value: number;
   unit: string | null;
+  comptage: boolean;
+  period_start: string;
+  period_end: string;
 };
 
 export async function fetchAllNews(): Promise<News[]> {
@@ -520,7 +568,14 @@ export async function fetchSubmissionHistory(submissionId: string): Promise<Subm
   return (data ?? []) as SubmissionStatusHistory[];
 }
 
-export type MetricHistoryPoint = { id: string; metric_key: string; value: number; recorded_at: string };
+export type MetricHistoryPoint = {
+  id: string;
+  metric_key: string;
+  value: number;
+  recorded_at: string;
+  period_start: string | null;
+  period_end: string | null;
+};
 
 export async function fetchMetricHistory(key: string): Promise<MetricHistoryPoint[]> {
   const { data, error } = await supabase

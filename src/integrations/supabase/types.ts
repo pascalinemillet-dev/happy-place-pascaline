@@ -221,22 +221,31 @@ export type Database = {
       }
       metrics: {
         Row: {
+          comptage: boolean
           key: string
           label: string
+          period_end: string | null
+          period_start: string | null
           unit: string | null
           updated_at: string
           value: number
         }
         Insert: {
+          comptage?: boolean
           key: string
           label: string
+          period_end?: string | null
+          period_start?: string | null
           unit?: string | null
           updated_at?: string
           value: number
         }
         Update: {
+          comptage?: boolean
           key?: string
           label?: string
+          period_end?: string | null
+          period_start?: string | null
           unit?: string | null
           updated_at?: string
           value?: number
@@ -247,18 +256,24 @@ export type Database = {
         Row: {
           id: string
           metric_key: string
+          period_end: string | null
+          period_start: string | null
           recorded_at: string
           value: number
         }
         Insert: {
           id?: string
           metric_key: string
+          period_end?: string | null
+          period_start?: string | null
           recorded_at?: string
           value: number
         }
         Update: {
           id?: string
           metric_key?: string
+          period_end?: string | null
+          period_start?: string | null
           recorded_at?: string
           value?: number
         }
@@ -467,9 +482,15 @@ export type Database = {
     Views: {
       metrics_with_trend: {
         Row: {
+          comptage: boolean | null
           delta: number | null
           key: string | null
           label: string | null
+          period_end: string | null
+          period_start: string | null
+          previous_period_end: string | null
+          previous_period_start: string | null
+          previous_recorded_at: string | null
           previous_value: number | null
           trend: string | null
           unit: string | null

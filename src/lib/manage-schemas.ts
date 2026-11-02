@@ -89,7 +89,18 @@ export const metricSchema = z.object({
     .number({ invalid_type_error: "Valeur numérique requise" })
     .finite("Valeur numérique requise"),
   unit: z.string().trim().max(8, "8 caractères maximum").nullable(),
-});
+  comptage: z.boolean(),
+  period_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date de début requise"),
+  period_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date de fin requise"),
+})
+  .refine((m) => m.period_end >= m.period_start, {
+    message: "La fin de la période doit suivre son début",
+    path: ["period_end"],
+  })
+  .refine((m) => !m.comptage || Number.isInteger(m.value), {
+    message: "Un comptage est un nombre entier",
+    path: ["value"],
+  });
 
 export type FieldErrors = Record<string, string>;
 
