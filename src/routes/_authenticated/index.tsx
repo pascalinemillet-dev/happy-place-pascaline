@@ -24,6 +24,7 @@ import {
   deltaText,
   comparedText,
   dateFr,
+  dashboardMetrics,
   formatMetricValue,
   periodText,
   fetchNews,
@@ -641,13 +642,38 @@ function ManagerSpace() {
           >
             <div className="flex items-center justify-between mb-xs">
               <h2 className="font-headline-sm text-headline-sm text-primary">Indicateurs</h2>
-              {isAdmin && <Icon name="settings" className="text-on-surface-variant cursor-pointer" />}
+              {isAdmin && (
+                <Link
+                  to="/manage/metrics"
+                  aria-label="Choisir les indicateurs affichés"
+                  title="Choisir les indicateurs affichés"
+                  className="text-on-surface-variant hover:text-primary"
+                >
+                  <Icon name="settings" />
+                </Link>
+              )}
             </div>
             <ModuleHint module="indicateurs" className="mb-md" />
-            <div className="grid grid-cols-2 gap-sm mb-md">
-              <MetricCard m={metricOf(metrics.data, "taux_placement")} fallback="Taux de placement" />
-              <MetricCard m={metricOf(metrics.data, "missions_actives")} fallback="Missions actives" />
-            </div>
+            {/* Indicateurs choisis par l'admin (US43), dans leur ordre ; la grille passe à la ligne */}
+            {metrics.isSuccess && dashboardMetrics(metrics.data).length === 0 ? (
+              <p className="text-body-sm text-on-surface-variant italic mb-md">
+                Aucun indicateur n'est affiché pour le moment.
+                {isAdmin && " Choisissez-les dans « Gérer les données > Indicateurs »."}
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-sm mb-md">
+                {metrics.isSuccess ? (
+                  dashboardMetrics(metrics.data).map((m) => (
+                    <MetricCard key={m.key} m={m} fallback={m.label} />
+                  ))
+                ) : (
+                  <>
+                    <MetricCard m={undefined} fallback="Indicateur" />
+                    <MetricCard m={undefined} fallback="Indicateur" />
+                  </>
+                )}
+              </div>
+            )}
             {isAdmin && <div className="space-y-xs">
               <label className="font-label-sm text-label-sm text-on-surface-variant block">
                 MODIFIER LE NPS CANDIDATS

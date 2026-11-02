@@ -221,9 +221,11 @@ export type Database = {
       }
       metrics: {
         Row: {
+          afficher_dashboard: boolean
           comptage: boolean
           key: string
           label: string
+          ordre_dashboard: number
           period_end: string | null
           period_start: string | null
           unit: string | null
@@ -231,9 +233,11 @@ export type Database = {
           value: number
         }
         Insert: {
+          afficher_dashboard?: boolean
           comptage?: boolean
           key: string
           label: string
+          ordre_dashboard?: number
           period_end?: string | null
           period_start?: string | null
           unit?: string | null
@@ -241,9 +245,11 @@ export type Database = {
           value: number
         }
         Update: {
+          afficher_dashboard?: boolean
           comptage?: boolean
           key?: string
           label?: string
+          ordre_dashboard?: number
           period_end?: string | null
           period_start?: string | null
           unit?: string | null
@@ -482,10 +488,12 @@ export type Database = {
     Views: {
       metrics_with_trend: {
         Row: {
+          afficher_dashboard: boolean | null
           comptage: boolean | null
           delta: number | null
           key: string | null
           label: string | null
+          ordre_dashboard: number | null
           period_end: string | null
           period_start: string | null
           previous_period_end: string | null

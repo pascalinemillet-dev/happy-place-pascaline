@@ -92,6 +92,12 @@ export const metricSchema = z.object({
   comptage: z.boolean(),
   period_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date de début requise"),
   period_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date de fin requise"),
+  afficher_dashboard: z.boolean(),
+  ordre_dashboard: z
+    .number({ invalid_type_error: "Ordre de 1 à 99" })
+    .int("Ordre de 1 à 99")
+    .min(1, "Ordre de 1 à 99")
+    .max(99, "Ordre de 1 à 99"),
 })
   .refine((m) => m.period_end >= m.period_start, {
     message: "La fin de la période doit suivre son début",

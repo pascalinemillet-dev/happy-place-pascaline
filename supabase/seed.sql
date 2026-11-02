@@ -156,6 +156,10 @@ SELECT k, l, v, u, t, c,
     ('postes_ouverts',          'Postes ouverts',              63,   NULL, now() - interval '12 days', true),
     ('entretiens_realises',     'Entretiens réalisés',         186,  NULL, now() - interval '12 days', true)) AS m(k, l, v, u, t, c);
 
+-- Indicateurs affichés sur le dashboard (US43) : les deux de la V1, dans le même ordre
+UPDATE public.metrics SET afficher_dashboard = true, ordre_dashboard = 1 WHERE key = 'taux_placement';
+UPDATE public.metrics SET afficher_dashboard = true, ordre_dashboard = 2 WHERE key = 'missions_actives';
+
 -- Le trigger d'historique a ajouté une ligne datée d'aujourd'hui : on la recale
 -- sur la date de mise à jour, et on retire les doublons de valeur inchangée.
 UPDATE public.metrics_history h SET recorded_at = m.updated_at

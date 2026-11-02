@@ -81,7 +81,16 @@ export type Metric = {
   previous_recorded_at: string | null;
   previous_period_start: string | null;
   previous_period_end: string | null;
+  afficher_dashboard: boolean;
+  ordre_dashboard: number;
 };
+
+/** Indicateurs choisis par l'admin pour le dashboard (US43), dans leur ordre. */
+export function dashboardMetrics(metrics: Metric[] | undefined): Metric[] {
+  return (metrics ?? [])
+    .filter((m) => m.afficher_dashboard)
+    .sort((a, b) => a.ordre_dashboard - b.ordre_dashboard || a.label.localeCompare(b.label, "fr"));
+}
 
 const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
   "septembre", "octobre", "novembre", "décembre"];
@@ -389,6 +398,8 @@ export type MetricInput = {
   comptage: boolean;
   period_start: string;
   period_end: string;
+  afficher_dashboard: boolean;
+  ordre_dashboard: number;
 };
 
 export async function fetchAllNews(): Promise<News[]> {

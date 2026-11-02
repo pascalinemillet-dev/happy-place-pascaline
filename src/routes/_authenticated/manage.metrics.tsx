@@ -50,6 +50,8 @@ type FormState = {
   comptage: boolean;
   period_start: string;
   period_end: string;
+  afficher_dashboard: boolean;
+  ordre_dashboard: string;
 };
 
 const empty: FormState = {
@@ -60,6 +62,8 @@ const empty: FormState = {
   comptage: false,
   period_start: "",
   period_end: "",
+  afficher_dashboard: false,
+  ordre_dashboard: "99",
 };
 
 function ManageMetrics() {
@@ -112,6 +116,8 @@ function ManageMetrics() {
       comptage: form.comptage,
       period_start: form.period_start,
       period_end: form.period_end,
+      afficher_dashboard: form.afficher_dashboard,
+      ordre_dashboard: Number(form.ordre_dashboard),
     };
     const res = validate(metricSchema, candidate);
     if (!res.ok) {
@@ -158,6 +164,9 @@ function ManageMetrics() {
               <p className="text-[11px] font-label-sm text-on-surface-variant mt-xs">
                 Période : {periodText(m.period_start, m.period_end)} · Mis à jour le{" "}
                 {dateFr(m.updated_at)}
+                {m.afficher_dashboard
+                  ? ` · Sur le dashboard (n° ${m.ordre_dashboard})`
+                  : " · Absent du dashboard"}
               </p>
               <p className="text-[11px] font-label-sm text-on-surface-variant">
                 {m.key} • {TREND_LABELS[m.trend]}
@@ -183,6 +192,8 @@ function ManageMetrics() {
                   comptage: m.comptage,
                   period_start: m.period_start ?? "",
                   period_end: m.period_end ?? "",
+                  afficher_dashboard: m.afficher_dashboard,
+                  ordre_dashboard: String(m.ordre_dashboard),
                 });
               }}
               onDelete={() => setToDelete(m)}
@@ -258,6 +269,27 @@ function ManageMetrics() {
             <p className="text-[11px] text-on-surface-variant">
               La période de calcul est obligatoire : elle s'affiche sur la carte de l'indicateur.
             </p>
+            <div className="grid grid-cols-2 gap-sm items-end">
+              <label className="flex items-center gap-xs text-body-sm text-primary pb-sm">
+                <input
+                  type="checkbox"
+                  checked={form.afficher_dashboard}
+                  onChange={(e) => setForm({ ...form, afficher_dashboard: e.target.checked })}
+                />
+                Afficher sur le dashboard
+              </label>
+              <Field label="Ordre sur le dashboard (1 à 99)" error={errors.ordre_dashboard}>
+                <TextInput
+                  type="number"
+                  min={1}
+                  max={99}
+                  step={1}
+                  value={form.ordre_dashboard}
+                  disabled={!form.afficher_dashboard}
+                  onChange={(e) => setForm({ ...form, ordre_dashboard: e.target.value })}
+                />
+              </Field>
+            </div>
             <FormActions pending={save.isPending} onCancel={close} />
           </form>
         </Modal>
