@@ -98,6 +98,8 @@ function jsonPart(raw: string): string {
 export const PROMPT_TITRE =
   "Tu rédiges des titres de points bloquants pour un tableau de bord interne. " +
   "Donne un titre factuel en français, 80 caractères au plus, sans point final ni guillemets. " +
+  "Reprends seulement les faits de la description : n'ajoute ni cause, ni conséquence, ni détail " +
+  "qui n'y figure pas. Si la description est vague, le titre reste vague. " +
   "N'écris jamais de nom ni de prénom de personne, même si la description en contient : " +
   "remplace-le par un rôle ou une équipe. Réponds uniquement par le titre.";
 
@@ -106,6 +108,8 @@ export const PROMPT_RECAP =
   "Tu prépares le point d'équipe d'un manager. Tu reçois une liste d'éléments en JSON. " +
   "Pour chaque élément, écris UNE phrase en français de 25 mots au plus qui dit ce que c'est " +
   "et ce qu'il faut en retenir. N'indique ni équipe ni durée : l'application les ajoute. " +
+  "Reprends seulement les faits du titre et de la description : n'ajoute ni cause, ni conséquence, " +
+  "ni urgence, ni détail qui n'y figure pas. Si un élément est vague, la phrase reste vague. " +
   "N'écris jamais de nom ni de prénom de personne, même si une description en contient : " +
   "remplace-le par un rôle ou une équipe. " +
   'Réponds uniquement en JSON : {"items":[{"id":"…","text":"…"}]}, avec les mêmes id.';
