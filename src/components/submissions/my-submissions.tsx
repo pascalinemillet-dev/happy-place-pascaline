@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Modal } from "@/components/manage/crud-ui";
+import { SubmitModal } from "@/components/submissions/submit-modal";
 import { AttachmentLink } from "@/components/attachment-link";
 import { SubmissionPreview, formatExactDate } from "@/components/expandable-card";
 import { KindTag } from "@/components/submissions/pending-queue";
@@ -9,6 +12,7 @@ import {
   ADMIN_LABEL,
   KIND_LABELS,
   MY_STATUS_LABELS,
+  archiveSubmission,
   assigneeLine,
   countMySubmissions,
   fetchAssigneeNames,
@@ -20,6 +24,11 @@ import { useModuleViewed } from "@/lib/use-module-viewed";
 import { ModuleHint, hintId } from "@/components/module-hint";
 
 function statusBadge(s: MySubmission): { label: string; className: string } {
+  if (s.status === "refusée" && s.archived_at)
+    return {
+      label: "ARCHIVÉE",
+      className: "border border-outline-variant text-on-surface-variant bg-card",
+    };
   if (s.status === "refusée")
     return { label: "REFUSÉE", className: "bg-error-container text-on-error-container" };
   // US67 : une idée validée et un point bloquant créé s'affichent tous deux « PUBLIÉE ».
@@ -42,6 +51,7 @@ const STATUS_OPTIONS: { value: MyStatusFilter; label: string }[] = [
   { value: "en attente", label: "En attente" },
   { value: "validée", label: "Publiée" },
   { value: "refusée", label: "Refusée" },
+  { value: "archivée", label: "Archivée" },
   { value: "tous", label: "Tous les statuts" },
 ];
 
@@ -53,10 +63,15 @@ function emptyMessage(status: MyStatusFilter, kind: "tous" | SubmissionKind): st
     return "Vous n'avez encore rien soumis.";
   }
   if (kind === "point bloquant") {
-    const masculin = { "en attente": "en attente", validée: "publié", refusée: "refusé" };
+    const masculin = {
+      "en attente": "en attente",
+      validée: "publié",
+      refusée: "refusé",
+      archivée: "archivé",
+    };
     return `Aucun point bloquant ${masculin[status]}.`;
   }
-  const label = MY_STATUS_LABELS[status];
+  const label = status === "archivée" ? "archivée" : MY_STATUS_LABELS[status];
   if (kind === "idée") return `Aucune idée ${label}.`;
   return `Aucune soumission ${label}.`;
 }
@@ -73,11 +88,13 @@ const labelClass =
  * Arriver par un lien `#mes-soumissions` (e-mails US61 et US65) ouvre le filtre sur « Tous les statuts ».
  */
 export function MySubmissions({
+  role,
   email,
   onRead,
   layout = "pleine",
   hideWhenEmpty = false,
 }: {
+  role: string;
   email: string;
   onRead: (s: Submission) => void;
   layout?: "pleine" | "colonne";
@@ -86,7 +103,21 @@ export function MySubmissions({
 }) {
   const [status, setStatus] = useState<MyStatusFilter>("en attente");
   const [type, setType] = useState<"tous" | SubmissionKind>("tous");
+  const [editing, setEditing] = useState<MySubmission | null>(null);
+  const [archiving, setArchiving] = useState<MySubmission | null>(null);
   const ref = useModuleViewed<HTMLElement>("mes_soumissions");
+  const qc = useQueryClient();
+
+  // US68 : archiver une soumission refusée (elle reste lisible dans « Archivée »).
+  const archive = useMutation({
+    mutationFn: (s: MySubmission) => archiveSubmission(s.id),
+    onSuccess: () => {
+      setArchiving(null);
+      toast.success("Soumission archivée");
+      qc.invalidateQueries({ queryKey: ["submissions"] });
+    },
+    onError: (e: unknown) => toast.error((e as Error).message),
+  });
 
   // Lien d'un e-mail (refus, publication) : la soumission n'est plus en attente.
   useEffect(() => {
@@ -194,7 +225,8 @@ export function MySubmissions({
               <p className="text-[11px] font-label-sm text-on-surface-variant uppercase mt-xs">
                 {s.status === "en attente" ? (
                   <>
-                    <AssignedTo s={s} /> · envoyé {timeAgo(s.created_at)}
+                    <AssignedTo s={s} /> · {s.resubmission_count ? "renvoyé" : "envoyé"}{" "}
+                    {timeAgo(s.created_at)}
                   </>
                 ) : s.kind === "point bloquant" && s.blocker_status ? (
                   <>
@@ -203,8 +235,9 @@ export function MySubmissions({
                   </>
                 ) : (
                   <>
-                    {MY_STATUS_LABELS[s.status as Exclude<MyStatusFilter, "tous">] ?? s.status} ·{" "}
-                    {s.team} · dernier changement le {formatExactDate(s.last_change_at)}
+                    {MY_STATUS_LABELS[s.status as Exclude<MyStatusFilter, "tous" | "archivée">] ??
+                      s.status}{" "}
+                    · {s.team} · dernier changement le {formatExactDate(s.last_change_at)}
                   </>
                 )}
               </p>
@@ -216,10 +249,78 @@ export function MySubmissions({
                   </p>
                 </div>
               )}
+              {s.status === "refusée" && !s.archived_at && (
+                <div className="flex flex-wrap gap-xs mt-xs">
+                  <button
+                    type="button"
+                    aria-haspopup="dialog"
+                    onClick={() => setEditing(s)}
+                    className="px-sm py-1 bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90"
+                  >
+                    MODIFIER ET RENVOYER
+                  </button>
+                  <button
+                    type="button"
+                    aria-haspopup="dialog"
+                    onClick={() => setArchiving(s)}
+                    className="px-sm py-1 border border-outline text-primary font-label-sm text-label-sm hover:bg-surface-container"
+                  >
+                    ARCHIVER
+                  </button>
+                </div>
+              )}
+              {s.archived_at && (
+                <p className="text-[11px] font-label-sm text-on-surface-variant uppercase mt-xs">
+                  Archivée le {formatExactDate(s.archived_at)}
+                </p>
+              )}
             </div>
           );
         })}
       </div>
+      {editing && (
+        <SubmitModal
+          role={role}
+          email={email}
+          managerTeams={[]}
+          resubmit={editing}
+          onClose={() => setEditing(null)}
+          onSent={(sent) => {
+            setEditing(null);
+            setStatus("en attente");
+            toast.success(
+              `${sent.kind === "point bloquant" ? "Point bloquant renvoyé" : "Idée renvoyée"}${
+                sent.assignedTo ? ` à ${sent.assignedTo}` : ""
+              }.`,
+            );
+          }}
+        />
+      )}
+      {archiving && (
+        <Modal title="Archiver la soumission" onClose={() => setArchiving(null)}>
+          <p className="font-body-md text-on-surface">
+            Archiver cette soumission refusée ? Elle ne pourra plus être renvoyée. Vous la
+            retrouverez avec le filtre « Archivée ».
+          </p>
+          <div className="flex justify-end gap-xs pt-sm">
+            <button
+              type="button"
+              onClick={() => setArchiving(null)}
+              className="px-md py-xs border border-outline text-primary font-label-md text-label-md hover:bg-surface-container"
+            >
+              ANNULER
+            </button>
+            <button
+              type="button"
+              disabled={archive.isPending}
+              onClick={() => archive.mutate(archiving)}
+              className="px-lg py-xs bg-primary text-on-primary font-label-md text-label-md disabled:opacity-50"
+            >
+              {archive.isPending ? "…" : "ARCHIVER"}
+            </button>
+          </div>
+        </Modal>
+      )}
     </section>
   );
 }

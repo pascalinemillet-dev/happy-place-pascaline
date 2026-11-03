@@ -387,11 +387,11 @@ function ManagerSpace() {
               </section>
 
               {/* Mes soumissions, masqué tant que le manager ou l'admin n'a rien soumis */}
-              <MySubmissions email={myEmail} onRead={setReading} hideWhenEmpty />
+              <MySubmissions role={role} email={myEmail} onRead={setReading} hideWhenEmpty />
             </>
           ) : (
             /* Collaborateur (US67) : un seul bloc, à la place de « Soumissions en attente » */
-            <MySubmissions email={myEmail} onRead={setReading} layout="colonne" />
+            <MySubmissions role={role} email={myEmail} onRead={setReading} layout="colonne" />
           )}
 
           <ValidatedSubmissions

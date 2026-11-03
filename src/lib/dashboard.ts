@@ -37,6 +37,10 @@ export type Submission = {
   proposed_title?: string | null;
   proposed_title_by_ai?: boolean;
   blocker_id?: string | null;
+  /** US68 : nombre de renvois après refus, date d'archivage par l'auteur, date du premier envoi. */
+  resubmission_count?: number;
+  archived_at?: string | null;
+  first_submitted_at?: string | null;
 };
 
 export type SubmissionKind = Enums["submission_kind"];

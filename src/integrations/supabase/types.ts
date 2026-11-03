@@ -454,6 +454,9 @@ export type Database = {
           proposed_title: string | null
           proposed_title_by_ai: boolean
           blocker_id: string | null
+          archived_at: string | null
+          resubmission_count: number
+          first_submitted_at: string | null
         }
         Insert: {
           kind?: Database["public"]["Enums"]["submission_kind"]
@@ -472,6 +475,9 @@ export type Database = {
           status?: Database["public"]["Enums"]["submission_status"]
           submitted_by_email?: string | null
           team: string
+          archived_at?: string | null
+          resubmission_count?: number
+          first_submitted_at?: string | null
         }
         Update: {
           attachment_name?: string | null
@@ -493,6 +499,9 @@ export type Database = {
           proposed_title?: string | null
           proposed_title_by_ai?: boolean
           blocker_id?: string | null
+          archived_at?: string | null
+          resubmission_count?: number
+          first_submitted_at?: string | null
         }
         Relationships: [
           {
@@ -596,6 +605,21 @@ export type Database = {
           _severity: Database["public"]["Enums"]["blocker_severity"]
         }
         Returns: string
+      }
+      resubmit_submission: {
+        Args: {
+          _submission_id: string
+          _kind: Database["public"]["Enums"]["submission_kind"]
+          _severity: Database["public"]["Enums"]["blocker_severity"] | null
+          _content: string
+          _attachment_path: string | null
+          _attachment_name: string | null
+        }
+        Returns: undefined
+      }
+      archive_submission: {
+        Args: { _submission_id: string }
+        Returns: undefined
       }
       save_proposed_title: {
         Args: { _submission_id: string; _title: string | null; _by_ai: boolean }

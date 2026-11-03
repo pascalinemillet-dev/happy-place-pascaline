@@ -8,7 +8,7 @@ import {
   Select,
   TextArea,
 } from "@/components/manage/crud-ui";
-import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card";
+import { CharCounter, formatExactDate, rejectionErrorMessage } from "@/components/expandable-card";
 import { newSubmissionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
 import {
   SEVERITY_LABELS,
@@ -22,7 +22,9 @@ import {
   assigneeLine,
   fetchAssigneeNames,
   fetchMyProfile,
+  resubmitSubmission,
   trackEvent,
+  type MySubmission,
 } from "@/lib/f1";
 import { toast } from "sonner";
 
@@ -33,27 +35,36 @@ const KIND_CHOICES: { kind: SubmissionKind; title: string; help: string }[] = [
 
 export type SentSubmission = { kind: SubmissionKind; assignedTo: string };
 
-/** Formulaire « Soumettre » : type, personne assignée, description, sévérité (US29, US30). */
+/**
+ * Formulaire « Soumettre » : type, personne assignée, description, sévérité (US29, US30).
+ * US68 : avec `resubmit`, le même formulaire modifie une soumission refusée et la renvoie.
+ * Tout se modifie sauf l'équipe ; le circuit est celui d'un envoi.
+ */
 export function SubmitModal({
   role,
   email,
   managerTeams,
   onClose,
   onSent,
+  resubmit,
 }: {
   role: string;
   email: string;
   managerTeams: string[];
   onClose: () => void;
   onSent: (sent: SentSubmission) => void;
+  resubmit?: MySubmission;
 }) {
   const qc = useQueryClient();
   const openedAt = useRef(Date.now());
-  const [kind, setKind] = useState<SubmissionKind | null>(null);
-  const [severity, setSeverity] = useState<BlockerSeverity | "">("");
-  const [content, setContent] = useState("");
-  const [team, setTeam] = useState(managerTeams.length === 1 ? managerTeams[0] : "");
+  const [kind, setKind] = useState<SubmissionKind | null>(resubmit?.kind ?? null);
+  const [severity, setSeverity] = useState<BlockerSeverity | "">(resubmit?.severity ?? "");
+  const [content, setContent] = useState(resubmit?.content ?? "");
+  const [team, setTeam] = useState(
+    resubmit ? resubmit.team : managerTeams.length === 1 ? managerTeams[0] : "",
+  );
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [keepAttachment, setKeepAttachment] = useState(!!resubmit?.attachment_path);
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const profile = useQuery({
@@ -65,12 +76,17 @@ export function SubmitModal({
     if (!team && managerTeams.length === 1) setTeam(managerTeams[0]);
   }, [managerTeams, team]);
 
-  const ownTeam =
-    role === "admin" ? "Admin" : role === "manager" ? team : (profile.data?.team ?? "");
+  const ownTeam = resubmit
+    ? resubmit.team
+    : role === "admin"
+      ? "Admin"
+      : role === "manager"
+        ? team
+        : (profile.data?.team ?? "");
   const assignees = useQuery({
     queryKey: ["assignees", role, ownTeam],
     queryFn: () => fetchAssigneeNames(ownTeam || null),
-    enabled: !!kind && (role !== "manager" || !!team),
+    enabled: !!kind && (!!resubmit || role !== "manager" || !!team),
     retry: false,
   });
   const managers = assignees.data ?? [];
@@ -78,12 +94,28 @@ export function SubmitModal({
 
   const submit = useMutation({
     mutationFn: (input: Parameters<typeof submitSubmission>[0]) =>
-      submitSubmission(input, attachment),
+      resubmit
+        ? resubmitSubmission(
+            {
+              id: resubmit.id,
+              kind: input.kind,
+              severity: input.severity ?? null,
+              content: input.content,
+              keptAttachment:
+                keepAttachment && resubmit.attachment_path
+                  ? { path: resubmit.attachment_path, name: resubmit.attachment_name ?? null }
+                  : null,
+            },
+            attachment,
+          )
+        : submitSubmission(input, attachment),
     onSuccess: (_d, input) => {
-      trackEvent("submission_sent", "soumettre", {
-        kind: input.kind,
-        seconds: Math.round((Date.now() - openedAt.current) / 1000),
-      });
+      if (!resubmit) {
+        trackEvent("submission_sent", "soumettre", {
+          kind: input.kind,
+          seconds: Math.round((Date.now() - openedAt.current) / 1000),
+        });
+      }
       qc.invalidateQueries({ queryKey: ["submissions"] });
       onSent({ kind: input.kind, assignedTo: assigned });
     },
@@ -104,9 +136,14 @@ export function SubmitModal({
     const result = validate(newSubmissionSchema, {
       kind,
       severity: kind === "point bloquant" && severity ? severity : null,
-      author_name: profile.data?.fullName ?? "",
-      team:
-        role === "collaborateur" ? (profile.data?.team ?? "") : role === "admin" ? "Admin" : team,
+      author_name: resubmit ? resubmit.author_name : (profile.data?.fullName ?? ""),
+      team: resubmit
+        ? resubmit.team
+        : role === "collaborateur"
+          ? (profile.data?.team ?? "")
+          : role === "admin"
+            ? "Admin"
+            : team,
       content,
     });
     if (!result.ok) {
@@ -117,12 +154,29 @@ export function SubmitModal({
     submit.mutate(result.data);
   }
 
-  const teamLabel = role === "admin" ? "Administration HappyPlace" : ownTeam || "équipe à choisir";
+  const teamLabel =
+    ownTeam === "Admin" ? "Administration HappyPlace" : ownTeam || "équipe à choisir";
 
   return (
-    <Modal title="Soumettre" onClose={onClose}>
+    <Modal title={resubmit ? "Modifier et renvoyer" : "Soumettre"} onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-md" noValidate>
         <ErrorSummary errors={errors} />
+
+        {resubmit && (
+          <div className="p-sm bg-error-container text-on-error-container text-body-sm wrap-anywhere space-y-1">
+            <p className="font-bold">
+              Refusée le {formatExactDate(resubmit.last_change_at)}
+              {resubmit.rejection_category ? ` · Motif : ${resubmit.rejection_category}` : ""}
+            </p>
+            {resubmit.rejection_note && (
+              <p className="whitespace-pre-line">Raison : {resubmit.rejection_note}</p>
+            )}
+            <p>
+              Modifiez ce qui doit l'être, puis renvoyez : la soumission repart en attente, comme un
+              nouvel envoi.
+            </p>
+          </div>
+        )}
 
         <div className="bg-surface-container-low p-sm space-y-1">
           <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">Auteur</p>
@@ -132,7 +186,7 @@ export function SubmitModal({
           <p className="text-body-sm text-on-surface-variant">Repris de votre compte.</p>
         </div>
 
-        {role === "manager" && managerTeams.length > 1 && (
+        {!resubmit && role === "manager" && managerTeams.length > 1 && (
           <Field label="Équipe concernée *" error={errors.team}>
             <Select value={team} onChange={(e) => setTeam(e.target.value)}>
               <option value="">Choisis une de tes équipes</option>
@@ -197,7 +251,7 @@ export function SubmitModal({
             <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
               Assigné à
             </p>
-            {role === "manager" && !team ? (
+            {!resubmit && role === "manager" && !team ? (
               <p className="text-body-sm text-on-surface-variant">
                 Choisis d'abord l'équipe concernée.
               </p>
@@ -207,7 +261,7 @@ export function SubmitModal({
               <>
                 <p className="font-body-md text-primary">{assigned || ADMIN_LABEL}</p>
                 <p className="text-body-sm text-on-surface-variant">
-                  {role === "admin"
+                  {ownTeam === "Admin"
                     ? "L'administration examinera votre soumission."
                     : assigneeHint(kind, managers)}
                 </p>
@@ -256,7 +310,25 @@ export function SubmitModal({
           </Field>
         )}
 
-        <Field label="Document PDF (optionnel, 20 Mo max)" error={errors.attachment}>
+        {resubmit?.attachment_path && !attachment && (
+          <label className="flex items-center gap-xs text-body-sm text-on-surface">
+            <input
+              type="checkbox"
+              checked={keepAttachment}
+              onChange={(e) => setKeepAttachment(e.target.checked)}
+            />
+            Garder la pièce jointe actuelle : {resubmit.attachment_name ?? "document PDF"}
+          </label>
+        )}
+
+        <Field
+          label={
+            resubmit?.attachment_path
+              ? "Remplacer par un autre PDF (optionnel, 20 Mo max)"
+              : "Document PDF (optionnel, 20 Mo max)"
+          }
+          error={errors.attachment}
+        >
           <input
             type="file"
             accept="application/pdf,.pdf"
@@ -280,7 +352,11 @@ export function SubmitModal({
           />
         </Field>
 
-        <FormActions pending={submit.isPending} submitLabel="ENVOYER" onCancel={onClose} />
+        <FormActions
+          pending={submit.isPending}
+          submitLabel={resubmit ? "RENVOYER" : "ENVOYER"}
+          onCancel={onClose}
+        />
       </form>
     </Modal>
   );

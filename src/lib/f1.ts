@@ -1,6 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import type { BlockerSeverity, Submission, SubmissionKind } from "@/lib/dashboard";
+import {
+  ATTACHMENT_BUCKET,
+  MAX_ATTACHMENT_BYTES,
+  type BlockerSeverity,
+  type Submission,
+  type SubmissionKind,
+} from "@/lib/dashboard";
 import { isLate } from "@/lib/recap";
 export { isLate };
 
@@ -115,10 +121,14 @@ export type MySubmission = Submission & {
   blocker_updated_at: string | null;
 };
 
-/** Filtre de statut de « Mes soumissions » (US67) : « validée » s'affiche « Publiée ». */
-export type MyStatusFilter = "tous" | "en attente" | "validée" | "refusée";
+/**
+ * Filtre de statut de « Mes soumissions » (US67) : « validée » s'affiche « Publiée ».
+ * US68 : « archivée » regroupe les soumissions refusées que l'auteur a archivées ;
+ * elles sortent de « Refusée » et de « Tous les statuts ».
+ */
+export type MyStatusFilter = "tous" | "en attente" | "validée" | "refusée" | "archivée";
 
-export const MY_STATUS_LABELS: Record<Exclude<MyStatusFilter, "tous">, string> = {
+export const MY_STATUS_LABELS: Record<Exclude<MyStatusFilter, "tous" | "archivée">, string> = {
   "en attente": "en attente",
   validée: "publiée",
   refusée: "refusée",
@@ -144,7 +154,12 @@ export async function fetchMySubmissionsDetailed(
   filters: { status?: MyStatusFilter; kind?: "tous" | SubmissionKind } = {},
 ): Promise<MySubmission[]> {
   let query = db.from("submissions").select("*").ilike("submitted_by_email", email);
-  if (filters.status && filters.status !== "tous") query = query.eq("status", filters.status);
+  if (filters.status === "archivée") {
+    query = query.eq("status", "refusée").not("archived_at", "is", null);
+  } else {
+    query = query.is("archived_at", null);
+    if (filters.status && filters.status !== "tous") query = query.eq("status", filters.status);
+  }
   if (filters.kind && filters.kind !== "tous") query = query.eq("kind", filters.kind);
   const { data, error } = await query.order("created_at", { ascending: false }).limit(10);
   if (error) throw error;
@@ -185,6 +200,49 @@ export async function fetchMySubmissionsDetailed(
       blocker_updated_at: b?.updated_at ?? null,
     };
   });
+}
+
+/* ---------- US68 : modifier et renvoyer une soumission refusée, ou l'archiver ---------- */
+
+export type ResubmitInput = {
+  id: string;
+  kind: SubmissionKind;
+  severity: BlockerSeverity | null;
+  content: string;
+  /** Pièce jointe à garder (chemin actuel) ; null pour la retirer. Ignoré si un fichier est fourni. */
+  keptAttachment: { path: string; name: string | null } | null;
+};
+
+/** Renvoie une soumission refusée : même circuit qu'un envoi, e-mail « renvoyé après refus ». */
+export async function resubmitSubmission(input: ResubmitInput, file?: File | null) {
+  let attachment = input.keptAttachment;
+  if (file) {
+    if (file.type !== "application/pdf") throw new Error("Seuls les fichiers PDF sont acceptés.");
+    if (file.size > MAX_ATTACHMENT_BYTES) throw new Error("Le fichier dépasse 20 Mo.");
+    const { data: u } = await db.auth.getUser();
+    if (!u.user) throw new Error("Session expirée");
+    const path = `${u.user.id}/${crypto.randomUUID()}.pdf`;
+    const { error: upErr } = await db.storage
+      .from(ATTACHMENT_BUCKET)
+      .upload(path, file, { contentType: "application/pdf" });
+    if (upErr) throw upErr;
+    attachment = { path, name: file.name.slice(0, 200) };
+  }
+  const { error } = await db.rpc("resubmit_submission", {
+    _submission_id: input.id,
+    _kind: input.kind,
+    _severity: input.kind === "point bloquant" ? input.severity : null,
+    _content: input.content,
+    _attachment_path: attachment?.path ?? null,
+    _attachment_name: attachment?.name ?? null,
+  });
+  if (error) throw error;
+}
+
+/** Archive une soumission refusée : elle reste lisible dans le filtre « Archivée ». */
+export async function archiveSubmission(id: string) {
+  const { error } = await db.rpc("archive_submission", { _submission_id: id });
+  if (error) throw error;
 }
 
 /* ---------- Suivi des événements (US34) : jamais de contenu saisi ---------- */

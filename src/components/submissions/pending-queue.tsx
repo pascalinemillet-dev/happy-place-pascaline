@@ -231,7 +231,15 @@ function CardHead({ s }: { s: Submission }) {
   return (
     <div className="flex items-start justify-between gap-sm">
       <div className="min-w-0 space-y-1">
-        <KindTag kind={s.kind} />
+        <div className="flex flex-wrap gap-xs">
+          <KindTag kind={s.kind} />
+          {/* US68 : soumission refusée puis modifiée et renvoyée par son auteur. */}
+          {!!s.resubmission_count && (
+            <span className="inline-block px-xs py-0.5 font-label-sm text-label-sm uppercase border border-outline-variant text-on-surface-variant">
+              Renvoyée après refus
+            </span>
+          )}
+        </div>
         <p className="font-body-sm text-primary font-bold wrap-anywhere">{s.author_name}</p>
         <p className="text-[10px] text-on-surface-variant font-label-sm wrap-anywhere">{s.team}</p>
       </div>
