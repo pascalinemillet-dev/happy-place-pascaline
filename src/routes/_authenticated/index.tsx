@@ -317,9 +317,9 @@ function ManagerSpace() {
                         type="button"
                         aria-haspopup="dialog"
                         onClick={() => setDraftsOpen(true)}
-                        className="flex items-center gap-xs px-sm py-xs border border-outline bg-surface text-primary font-label-sm text-label-sm hover:bg-surface-container"
+                        className="flex items-center gap-1 px-xs py-1 border border-outline bg-surface text-primary font-label-sm text-label-sm hover:bg-surface-container"
                       >
-                        <Icon name="draft" className="text-[16px] leading-none" /> BROUILLONS ({drafts})
+                        <Icon name="draft" className="text-[14px] leading-none" /> BROUILLONS ({drafts})
                       </button>
                     )}
                     <button
@@ -329,9 +329,9 @@ function ManagerSpace() {
                         setEditingDraft(null);
                         setEditorOpen(true);
                       }}
-                      className="flex items-center gap-xs px-sm py-xs border border-primary bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90"
+                      className="flex items-center gap-1 px-xs py-1 border border-primary bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90"
                     >
-                      <Icon name="add" className="text-[16px] leading-none" /> CRÉER UNE ACTUALITÉ
+                      <Icon name="add" className="text-[14px] leading-none" /> CRÉER UNE ACTUALITÉ
                     </button>
                   </div>
                 )}
