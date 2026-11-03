@@ -299,11 +299,11 @@ function ManagerSpace() {
         )}
 
         <div className="bento-grid">
-          {/* News Management & Input */}
+          {/* Actualités : même largeur que le bloc des soumissions (demande du 2026-11-03) */}
           <section
             ref={newsRef}
             aria-describedby={hintId("actus")}
-            className="col-span-12 lg:col-span-8 bg-surface-container-lowest border border-outline-variant p-md flex flex-col gap-md"
+            className="col-span-12 lg:col-span-6 bg-surface-container-lowest border border-outline-variant p-md flex flex-col gap-md"
           >
             <div className="border-b border-outline-variant pb-sm">
               <div className="flex flex-wrap items-center justify-between gap-sm">

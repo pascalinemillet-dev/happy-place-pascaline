@@ -356,7 +356,7 @@ export function MySubmissions({
       ref={ref}
       aria-describedby={hintId("mes-soumissions")}
       className={`${
-        column ? "col-span-12 lg:col-span-4 flex flex-col" : "col-span-12"
+        column ? "col-span-12 lg:col-span-6 flex flex-col" : "col-span-12"
       } min-w-0 bg-surface-container-lowest border border-outline-variant p-md`}
     >
       {body}

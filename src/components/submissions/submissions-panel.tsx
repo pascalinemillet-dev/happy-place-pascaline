@@ -74,7 +74,7 @@ export function SubmissionsPanel({
     <section
       id="mes-soumissions"
       aria-describedby={hintId(hint)}
-      className="col-span-12 lg:col-span-4 min-w-0 bg-surface-container-lowest border border-outline-variant p-md flex flex-col"
+      className="col-span-12 lg:col-span-6 min-w-0 bg-surface-container-lowest border border-outline-variant p-md flex flex-col"
     >
       <div className="border-b border-outline-variant pb-sm mb-sm space-y-xs">
         <div className="flex flex-wrap items-start justify-between gap-xs">
