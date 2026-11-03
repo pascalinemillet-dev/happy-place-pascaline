@@ -16,6 +16,7 @@ import { MySubmissions } from "@/components/submissions/my-submissions";
 import { SubmitModal, type SentSubmission } from "@/components/submissions/submit-modal";
 import { TeamRecapPanel } from "@/components/submissions/team-recap-panel";
 import { useModuleViewed } from "@/lib/use-module-viewed";
+import { fetchMyProfile } from "@/lib/f1";
 import { ModuleHint, hintId } from "@/components/module-hint";
 import { Button } from "@/components/ui/button";
 import {
@@ -141,7 +142,15 @@ function ManagerSpace() {
     }, 250);
     return () => window.clearInterval(timer);
   }, []);
+  // US66 : une actualité est signée du prénom et du nom de la liste blanche, à défaut de l'adresse.
+  const profile = useQuery({
+    queryKey: ["profile", myEmail],
+    enabled: canWriteNews && !!myEmail,
+    queryFn: () => fetchMyProfile(myEmail),
+  });
+  const profileName = profile.data && profile.data.fullName !== myEmail ? profile.data.fullName : "";
   const myName =
+    profileName ||
     (typeof meta.full_name === "string" && meta.full_name) ||
     (typeof meta.name === "string" && meta.name) ||
     myEmail;
