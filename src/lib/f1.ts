@@ -115,14 +115,38 @@ export type MySubmission = Submission & {
   blocker_updated_at: string | null;
 };
 
-/** « Mes soumissions » : type, statut, date du dernier changement, statut du point créé (US33). */
-export async function fetchMySubmissionsDetailed(email: string): Promise<MySubmission[]> {
-  const { data, error } = await db
+/** Filtre de statut de « Mes soumissions » (US67) : « validée » s'affiche « Publiée ». */
+export type MyStatusFilter = "tous" | "en attente" | "validée" | "refusée";
+
+export const MY_STATUS_LABELS: Record<Exclude<MyStatusFilter, "tous">, string> = {
+  "en attente": "en attente",
+  validée: "publiée",
+  refusée: "refusée",
+};
+
+/** Nombre total de soumissions de l'auteur, tous statuts et types confondus (US67). */
+export async function countMySubmissions(email: string): Promise<number> {
+  const { count, error } = await db
     .from("submissions")
-    .select("*")
-    .ilike("submitted_by_email", email)
-    .order("created_at", { ascending: false })
-    .limit(10);
+    .select("id", { count: "exact", head: true })
+    .ilike("submitted_by_email", email);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
+ * « Mes soumissions » : type, statut, date du dernier changement, statut du point créé (US33).
+ * Les filtres de statut et de type s'appliquent dans la requête (US67) : les 10 plus récentes
+ * de chaque filtre, pas un tri des 10 plus récentes tous statuts confondus.
+ */
+export async function fetchMySubmissionsDetailed(
+  email: string,
+  filters: { status?: MyStatusFilter; kind?: "tous" | SubmissionKind } = {},
+): Promise<MySubmission[]> {
+  let query = db.from("submissions").select("*").ilike("submitted_by_email", email);
+  if (filters.status && filters.status !== "tous") query = query.eq("status", filters.status);
+  if (filters.kind && filters.kind !== "tous") query = query.eq("kind", filters.kind);
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(10);
   if (error) throw error;
   const rows = (data ?? []) as Submission[];
   if (rows.length === 0) return [];

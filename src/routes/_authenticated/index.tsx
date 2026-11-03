@@ -375,17 +375,24 @@ function ManagerSpace() {
             </div>
           </section>
 
-          {/* Soumissions en attente (US63) */}
-          <section className="col-span-12 lg:col-span-4 min-w-0 bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
-            <PendingQueue
-              role={role}
-              mode="manager"
-              onPrepareRecap={role === "manager" ? () => setRecapOpen(true) : undefined}
-            />
-          </section>
+          {canReview ? (
+            <>
+              {/* Soumissions en attente (US63) : la file à traiter du manager et de l'admin */}
+              <section className="col-span-12 lg:col-span-4 min-w-0 bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
+                <PendingQueue
+                  role={role}
+                  mode="manager"
+                  onPrepareRecap={role === "manager" ? () => setRecapOpen(true) : undefined}
+                />
+              </section>
 
-          {/* Mes soumissions */}
-          <MySubmissions email={myEmail} onRead={setReading} />
+              {/* Mes soumissions, masqué tant que le manager ou l'admin n'a rien soumis */}
+              <MySubmissions email={myEmail} onRead={setReading} hideWhenEmpty />
+            </>
+          ) : (
+            /* Collaborateur (US67) : un seul bloc, à la place de « Soumissions en attente » */
+            <MySubmissions email={myEmail} onRead={setReading} layout="colonne" />
+          )}
 
           <ValidatedSubmissions
             role={role}
