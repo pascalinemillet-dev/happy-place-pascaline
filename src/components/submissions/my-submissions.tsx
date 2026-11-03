@@ -47,6 +47,9 @@ function AssignedTo({ s }: { s: MySubmission }) {
   return <>Assigné à {assigneeLine(s.kind, names.data) || ADMIN_LABEL}</>;
 }
 
+/** Envoyé par le lien « VOIR MES SOUMISSIONS », même quand l'adresse porte déjà #mes-soumissions. */
+export const SHOW_ALL_EVENT = "hp:mes-soumissions";
+
 const STATUS_OPTIONS: { value: MyStatusFilter; label: string }[] = [
   { value: "en attente", label: "En attente" },
   { value: "validée", label: "Publiée" },
@@ -119,14 +122,23 @@ export function MySubmissions({
     onError: (e: unknown) => toast.error((e as Error).message),
   });
 
-  // Lien d'un e-mail (refus, publication) : la soumission n'est plus en attente.
+  // Lien d'un e-mail (refus, publication) ou « VOIR MES SOUMISSIONS » après un envoi :
+  // tous les statuts et tous les types, pour que la soumission visée soit à l'écran.
   useEffect(() => {
-    const open = () => {
-      if (window.location.hash === "#mes-soumissions") setStatus("tous");
+    const showAll = () => {
+      setStatus("tous");
+      setType("tous");
     };
-    open();
-    window.addEventListener("hashchange", open);
-    return () => window.removeEventListener("hashchange", open);
+    const onHash = () => {
+      if (window.location.hash === "#mes-soumissions") showAll();
+    };
+    onHash();
+    window.addEventListener("hashchange", onHash);
+    window.addEventListener(SHOW_ALL_EVENT, showAll);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      window.removeEventListener(SHOW_ALL_EVENT, showAll);
+    };
   }, []);
 
   const total = useQuery({

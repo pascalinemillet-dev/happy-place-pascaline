@@ -12,7 +12,7 @@ import { NewsImage, NewsLinks } from "@/components/news-media";
 import { NewsDraftsModal, NewsEditorModal } from "@/components/news-modals";
 import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
 import { PendingQueue } from "@/components/submissions/pending-queue";
-import { MySubmissions } from "@/components/submissions/my-submissions";
+import { MySubmissions, SHOW_ALL_EVENT } from "@/components/submissions/my-submissions";
 import { SubmitModal, type SentSubmission } from "@/components/submissions/submit-modal";
 import { TeamRecapPanel } from "@/components/submissions/team-recap-panel";
 import { useModuleViewed } from "@/lib/use-module-viewed";
@@ -279,7 +279,11 @@ function ManagerSpace() {
               {sent.kind === "point bloquant" ? " Vous êtes en copie de l'e-mail." : ""}
             </p>
             <div className="flex items-center gap-sm">
-              <a href="#mes-soumissions" className="font-label-sm text-label-sm text-primary underline">
+              <a
+                href="#mes-soumissions"
+                onClick={() => window.dispatchEvent(new Event(SHOW_ALL_EVENT))}
+                className="font-label-sm text-label-sm text-primary underline"
+              >
                 VOIR MES SOUMISSIONS
               </a>
               <button
