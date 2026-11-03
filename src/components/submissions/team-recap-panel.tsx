@@ -258,7 +258,7 @@ function RecapCard({ item, withTeam }: { item: RecapItem; withTeam: boolean }) {
         {TYPE_LABELS[item.type]}
       </p>
       <p className="font-body-sm text-body-sm font-bold text-on-surface">{item.title}</p>
-      <p className="text-body-sm text-on-surface">{cardText(item)}</p>
+      {cardText(item) && <p className="text-body-sm text-on-surface">{cardText(item)}</p>}
       <p className="text-[11px] font-label-sm uppercase text-on-surface-variant">
         {cardMeta(item, withTeam).join(" · ")}
       </p>

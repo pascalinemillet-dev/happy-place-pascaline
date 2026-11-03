@@ -75,9 +75,13 @@ export function showTeam(r: RecapResult): boolean {
   return r.teams.length > 1;
 }
 
-/** Texte de la carte : la phrase de l'IA, sinon le début de la description. */
-export function cardText(i: RecapItem): string {
-  return i.text ?? i.excerpt;
+/**
+ * Texte de la carte : la phrase de l'IA, sinon le début de la description.
+ * null quand il répète le titre (une idée sans IA a pour titre le début de sa description).
+ */
+export function cardText(i: RecapItem): string | null {
+  const t = i.text ?? i.excerpt;
+  return t.trim() === i.title.trim() ? null : t;
 }
 
 /** Détails d'une carte : équipe (si plusieurs), statut du point, ancienneté, retard. */
@@ -112,7 +116,8 @@ export function recapToText(r: RecapResult): string {
     if (items.length === 0) lines.push("- Aucun élément.");
     for (const i of items) {
       lines.push(`- [${TYPE_LABELS[i.type]}] ${i.title}`);
-      lines.push(`  ${cardText(i)}`);
+      const text = cardText(i);
+      if (text) lines.push(`  ${text}`);
       lines.push(`  ${cardMeta(i, withTeam).join(" · ")}`);
     }
     lines.push("");
@@ -142,7 +147,9 @@ export function recapToHtml(r: RecapResult): string {
       `<div style="${font}margin:0 0 8px 0;padding:8px 10px;background:${c.bg};border-left:4px solid ${c.edge};color:#1b1c1c;">` +
       `<div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:${c.fg};font-weight:bold;">${esc(TYPE_LABELS[i.type])}</div>` +
       `<div style="font-size:13px;font-weight:bold;margin-top:2px;">${esc(i.title)}</div>` +
-      `<div style="font-size:12px;margin-top:2px;">${esc(cardText(i))}</div>` +
+      (cardText(i)
+        ? `<div style="font-size:12px;margin-top:2px;">${esc(cardText(i) ?? "")}</div>`
+        : "") +
       `<div style="font-size:10px;color:#5f6166;margin-top:4px;text-transform:uppercase;">${esc(cardMeta(i, withTeam).join(" · "))}</div>` +
       `</div>`
     );
