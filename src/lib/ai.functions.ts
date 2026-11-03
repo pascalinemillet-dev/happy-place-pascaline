@@ -43,7 +43,7 @@ export function aiEnabled(): boolean {
 
 /**
  * Envoie une consigne et un texte au scénario Make « HappyPlace - IA », qui appelle OpenAI
- * (Chat Completions, sans conservation) et renvoie `{ "reponse": "…" }`.
+ * (module « Generate a response », Store sur No : rien n'est conservé) et renvoie `{ "reponse": "…" }`.
  * Le secret partagé `x-happyplace-secret` empêche quiconque d'autre d'utiliser le scénario.
  * Renvoie null si Make ou l'IA ne répond pas : l'appelant affiche alors la version sans IA.
  */

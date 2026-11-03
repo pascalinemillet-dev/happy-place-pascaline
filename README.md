@@ -43,7 +43,7 @@ La connexion se fait par email et mot de passe, réservée aux adresses invitée
 1. Dans ton dépôt GitHub, ouvre le dossier **supabase**, puis le fichier **setup.sql**. Clique sur l'icône **Copy raw file** (deux carrés superposés, au-dessus du code à droite).
 2. Dans Supabase : **SQL Editor** → **+ New query**. Colle, puis clique sur **Run**.
 3. Si Supabase te demande comment gérer la sécurité des tables (RLS), choisis **Run without RLS** : le script active lui-même les règles de sécurité sur toutes les tables. Si un avertissement parle de « destructive operations », clique sur **Run this query**.
-4. Un tableau de 25 lignes apparaît : **toutes les lignes doivent indiquer `ok = true`**.
+4. Un tableau de 90 lignes apparaît : **toutes les lignes doivent indiquer `ok = true`**.
 5. Fais de même avec **seed.sql** (les données de démo), dans une **nouvelle** requête. Résultat attendu : « Success. No rows returned ».
 
 > Tu peux relancer `seed.sql` à tout moment pour remettre les contenus de démo dans leur état de départ. Les profils créés sont conservés.
@@ -65,7 +65,7 @@ Dans Supabase, clique sur **Connect** (en haut de la page) et note :
 3. Dans le terminal, tape `npm install` (attends la fin), puis `npm run dev`.
 4. Clique sur **Open in Browser** dans la fenêtre qui apparaît (ou onglet **Ports** → ligne **3000** → icône du globe).
 
-L'app s'ouvre directement sur **« Choisis ton rôle »**.
+L'app s'ouvre sur l'écran **Connexion**. Une adresse invitée crée son mot de passe avec « Première connexion ? Créer mon mot de passe ».
 
 Pour partager l'app avec ton groupe : onglet **Ports** → clic droit sur la ligne **3000** → **Port Visibility** → **Public**, puis copie l'adresse et envoie-la.
 
@@ -79,8 +79,8 @@ Pour partager l'app avec ton groupe : onglet **Ports** → clic droit sur la lig
 
 | Rôle | Ce qu'il peut faire |
 |---|---|
-| **Collaborateur** | Lit les actualités et les indicateurs, soumet des idées, questions ou problèmes pour son équipe. |
-| **Manager** | Valide ou refuse les demandes des équipes qu'il manage, rédige des actualités (en brouillon), suit les points bloquants. |
+| **Collaborateur** | Lit les actualités et les indicateurs, soumet une idée ou un point bloquant pour son équipe, suit ses soumissions, modifie et renvoie ou archive une soumission refusée. |
+| **Manager** | Valide ou refuse les soumissions des équipes qu'il manage, publie un point bloquant de son équipe, prépare son point d'équipe (récap par l'IA), rédige et publie des actualités. Sa propre soumission est validée par un autre manager ou par l'admin. |
 | **Admin** | Gère tout : contenus, indicateurs, équipes et utilisateurs (espace « Gérer les données »). |
 
 Ces droits sont appliqués **par la base elle-même** (règles RLS de Supabase), pas seulement par l'interface.
@@ -97,14 +97,21 @@ La base contient aussi dix membres fictifs de Bigger Boat (`@biggerboat.example`
 - **Structure** : les écrans sont dans `src/routes`, les composants dans `src/components`, et la base dans `supabase/migrations` (une migration par évolution, dans l'ordre).
 - **Modifier la base** : écris une nouvelle migration SQL plutôt que de modifier les anciennes. Après toute modification d'ENUM, de trigger ou de statut, lance `select * from private.run_smoke_tests();` : toutes les lignes doivent revenir à `ok = true`.
 - **Règles du projet** : le fichier `AGENTS.md` liste les conventions à respecter. Donne-le à ton assistant IA de code.
-- **Tâches automatiques** : deux tâches tournent chaque nuit dans Supabase (revalidation annuelle des contenus, départs programmés des collaborateurs). Tu les retrouves dans le module **Cron** de Supabase.
+- **Tâches automatiques** : trois tâches tournent chaque nuit dans Supabase (revalidation annuelle des contenus, départs programmés des collaborateurs, purge des e-mails de plus de 30 jours dans `notifications`). Tu les retrouves dans le module **Cron** de Supabase.
 - **Mise en ligne** : l'app est déployée sur Cloudflare Workers, branché sur ce dépôt GitHub (Workers Builds) : chaque envoi sur `main` redéploie l'app. Le build Nitro détecte Cloudflare tout seul (preset `cloudflare_module`) et complète `wrangler.jsonc`. Dans Cloudflare, `VITE_SUPABASE_URL` et `VITE_SUPABASE_PUBLISHABLE_KEY` se saisissent en **variables de build**, car Vite les intègre au moment du build.
 
 ## F1 « Signaler un point bloquant » (lot 1)
 
-- **Base déjà installée** : dans Supabase, **SQL Editor** → **+ New query**, colle le contenu de `supabase/migrations/20261031090000_f1_point_bloquant.sql`, puis **Run**. Lance ensuite `select * from private.run_smoke_tests();` : 25 lignes, toutes à `ok = true`. Sur un projet neuf, `setup.sql` contient déjà F1.
+- **Base déjà installée** : dans Supabase, **SQL Editor** → **+ New query**, colle le contenu de `supabase/migrations/20261031090000_f1_point_bloquant.sql`, puis **Run**, et de même pour chaque migration plus récente, dans l'ordre des noms. Lance ensuite `select * from private.run_smoke_tests();` : toutes les lignes doivent être à `ok = true` (90 au 2026-11-03). Sur un projet neuf, `setup.sql` contient déjà toutes les migrations.
 - **IA (titre US31 et récap US64)** : le Worker Cloudflare lit les données sous l'identité de l'utilisateur, puis appelle le scénario Make « HappyPlace - IA », qui appelle OpenAI. Dans Cloudflare (Workers → `happy-place-pascaline` → Settings → Variables and Secrets), ajoute en **Secret** `MAKE_AI_WEBHOOK_URL` (adresse du webhook Make) et `MAKE_AI_SECRET` (chaîne que le scénario vérifie dans l'en-tête `x-happyplace-secret`). Sans ces secrets, l'app marche sans IA : titre saisi à la main, récap en tableau.
-- **Scénario Make attendu** : webhook personnalisé → filtre sur l'en-tête `x-happyplace-secret` → OpenAI « Create a Completion » (message système = `consigne`, message utilisateur = `texte`, réponse en texte) → **Webhook response** avec, pour corps, le texte renvoyé par OpenAI. L'app retrouve elle-même le JSON du récap dans la réponse.
+- **Scénario Make attendu** : webhook personnalisé → filtre sur l'en-tête `x-happyplace-secret` → OpenAI « Generate a response » (Instructions = `consigne`, Prompt = `texte`, modèle `gpt-4o-mini`, Temperature 0.2, **Store : No**, **Create a new conversation : No**, réponse en texte) → **Webhook response** (statut 200, corps = résultat du module OpenAI). Store sur No : OpenAI ne conserve pas la réponse. L'app retrouve elle-même le JSON du récap dans la réponse ; si Make répond « Accepted » (scénario arrêté ou filtre bloquant), l'app passe en version sans IA.
+
+## Lot 2 : e-mails, indicateurs et suivi des soumissions
+
+- **E-mails (US60, US61, US62, US65, récap US64)** : la base prépare chaque e-mail par trigger dans la table `public.notifications` (événement, destinataires, copie, objet, corps HTML). La table est fermée à l'app. Un **webhook de base Supabase** (Integrations → Database Webhooks, table `notifications`, événement Insert, POST) envoie chaque ligne au scénario Make **R7**, qui l'expédie par Gmail. Le filtre de R7 laisse passer les événements `point_bloquant_soumis`, `point_bloquant_refuse`, `point_bloquant_publie`, `idee_soumise` et `recap_point_equipe`. Make ne reçoit aucune clé Supabase. Les adresses `.example`, `.invalid`, `.test` et `.localhost` sont écartées ; les lignes de plus de 30 jours sont purgées chaque nuit.
+- **Indicateurs (F4, US43)** : une valeur par indicateur et par mois terminé (`metrics_mensuels`), un seul mois affiché pour tous, choisi par l'admin (`indicateurs_reglages`) ; vue `indicateurs_du_mois` (écart avec le mois précédent, sens favorable propre à chaque indicateur) ; ordre d'affichage de 1 à 10, sans doublon.
+- **Écritures par fonctions seulement** : `publish_blocker_submission` (5 paramètres, description reformulée facultative), `resubmit_submission` et `archive_submission` (soumission refusée, auteur seul), `send_team_recap_email` (manager seul, vers sa propre adresse, 10 envois par heure au plus).
+- **Ordre de mise en ligne** : lancer la migration sur la base en ligne, vérifier le test de fumée, puis envoyer le commit. Dans l'autre ordre, l'app appelle une colonne ou une fonction absente.
 
 ## En cas de problème
 
