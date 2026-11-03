@@ -91,10 +91,13 @@ export const indicateurSchema = z.object({
   sens_favorable: z.enum(["hausse", "baisse"], { errorMap: () => ({ message: "Choisissez le sens favorable" }) }),
   afficher_dashboard: z.boolean(),
   ordre_dashboard: z
-    .number({ invalid_type_error: "Ordre de 1 à 99" })
-    .int("Ordre de 1 à 99")
-    .min(1, "Ordre de 1 à 99")
-    .max(99, "Ordre de 1 à 99"),
+    .number({ invalid_type_error: "Choisissez un ordre de 1 à 10" })
+    .int("Choisissez un ordre de 1 à 10")
+    .min(1, "Choisissez un ordre de 1 à 10")
+    .max(99, "Choisissez un ordre de 1 à 10"),
+}).refine((m) => !m.afficher_dashboard || m.ordre_dashboard <= 10, {
+  message: "Choisissez un ordre de 1 à 10",
+  path: ["ordre_dashboard"],
 });
 
 /** Valeur d'un indicateur pour un mois terminé (mois au format AAAA-MM-01). */

@@ -167,6 +167,9 @@ export async function fetchIndicateursDuMois(): Promise<IndicateurMois[]> {
   return (data ?? []) as IndicateurMois[];
 }
 
+/** Ordres proposés à l'admin pour le dashboard (US43, 2026-11-03). */
+export const ORDRES_DASHBOARD: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
 /** Indicateurs choisis par l'admin pour le dashboard (US43), dans leur ordre. */
 export function indicateursDashboard(list: IndicateurMois[] | undefined): IndicateurMois[] {
   return (list ?? [])
@@ -218,7 +221,12 @@ export function ecartText(ecart: number | string | null, unit: string | null, co
     maximumFractionDigits: comptage ? 0 : 1,
   });
   const sign = e > 0 ? "+" : e < 0 ? "−" : "";
-  const suffix = unit === "%" ? (Math.abs(e) >= 2 ? " pts" : " pt") : unit ? ` ${unit.trim()}` : "";
+  const suffix =
+    unit === "%"
+      ? Math.abs(e) >= 2 ? " pts" : " pt"
+      : unit
+        ? ` ${uniteMot(unit, e) ?? unit.trim()}`
+        : "";
   return `${sign}${abs}${suffix}`;
 }
 
@@ -314,8 +322,20 @@ export function messageIndicateur(e: unknown): string {
   const msg = (e as { message?: string })?.message ?? String(e);
   if (/n'est pas terminé/.test(msg)) return msg;
   if (/comptage/i.test(msg)) return "Un comptage est un nombre entier.";
+  if (/metrics_ordre_dashboard_unique/.test(msg)) return "Cet ordre est déjà pris par un autre indicateur du dashboard.";
+  if (/metrics_ordre_dashboard_affiche/.test(msg)) return "L'ordre d'un indicateur du dashboard va de 1 à 10.";
   if (/duplicate key|metrics_pkey/.test(msg)) return "Cette clé technique existe déjà.";
   return msg;
+}
+
+/**
+ * Unité en toutes lettres (« jours ») : séparée par une espace, au singulier
+ * en dessous de 2 (« 1,5 jour »). Un symbole (« % », « j ») reste collé.
+ */
+function uniteMot(unit: string, n: number): string | null {
+  const u = unit.trim();
+  if (!/^[a-zà-ÿ]{2,}$/i.test(u)) return null;
+  return Math.abs(n) < 2 && u.endsWith("s") ? u.slice(0, -1) : u;
 }
 
 export function formatMetricValue(value: number | string, unit: string | null, comptage = false): string {
@@ -323,6 +343,8 @@ export function formatMetricValue(value: number | string, unit: string | null, c
     minimumFractionDigits: !comptage && unit === "%" ? 1 : 0,
     maximumFractionDigits: comptage ? 0 : 1,
   });
+  const mot = unit ? uniteMot(unit, Number(value)) : null;
+  if (mot) return `${formatted} ${mot}`;
   return `${formatted}${unit ?? ""}`;
 }
 

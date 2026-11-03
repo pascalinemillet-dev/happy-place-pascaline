@@ -151,7 +151,7 @@ SELECT k, l, v, u, t, c,
     ('missions_actives',        'Missions actives',            34,   NULL, now() - interval '8 days',  true),
     ('nps_candidats',           'NPS candidats',               71,   NULL, now() - interval '8 days',  false),
     ('taux_acceptation',        'Taux d’acceptation',          84.3, '%',  now() - interval '12 days', false),
-    ('delai_moyen_recrutement', 'Délai moyen de recrutement',  31,   'j',  now() - interval '12 days', false),
+    ('delai_moyen_recrutement', 'Délai moyen de recrutement',  31,   'jours',  now() - interval '12 days', false),
     ('taux_reponse_candidats',  'Taux de réponse candidats',   27.8, '%',  now() - interval '12 days', false),
     ('postes_ouverts',          'Postes ouverts',              63,   NULL, now() - interval '12 days', true),
     ('entretiens_realises',     'Entretiens réalisés',         186,  NULL, now() - interval '12 days', true)) AS m(k, l, v, u, t, c);

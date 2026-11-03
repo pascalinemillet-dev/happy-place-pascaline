@@ -28,6 +28,7 @@ import {
   moisIso,
   moisText,
   MOIS_LABELS,
+  ORDRES_DASHBOARD,
   saveValeurMensuelle,
   updateIndicateur,
   updateMoisReference,
@@ -183,7 +184,8 @@ function ManageMetrics() {
       comptage: definition.comptage,
       sens_favorable: definition.sens_favorable,
       afficher_dashboard: definition.afficher_dashboard,
-      ordre_dashboard: Number(definition.ordre_dashboard),
+      // Un indicateur retiré du dashboard libère son ordre.
+      ordre_dashboard: definition.afficher_dashboard ? Number(definition.ordre_dashboard) : 99,
     };
     const res = validate(indicateurSchema, candidate);
     if (!res.ok) {
@@ -195,6 +197,13 @@ function ManageMetrics() {
   }
 
   const affiches = (list.data ?? []).filter((m) => m.afficher_dashboard).map((m) => m.key);
+  // Ordres de 1 à 10 que les autres indicateurs affichés n'ont pas déjà pris.
+  const ordresPris = new Set(
+    (list.data ?? [])
+      .filter((m) => m.afficher_dashboard && m.key !== editing?.key)
+      .map((m) => m.ordre_dashboard),
+  );
+  const ordresLibres = ORDRES_DASHBOARD.filter((o) => !ordresPris.has(o));
 
   return (
     <section className="space-y-md">
@@ -338,22 +347,43 @@ function ManageMetrics() {
                 <input
                   type="checkbox"
                   checked={definition.afficher_dashboard}
-                  onChange={(e) => setDefinition({ ...definition, afficher_dashboard: e.target.checked })}
+                  onChange={(e) => {
+                    const afficher = e.target.checked;
+                    const actuel = Number(definition.ordre_dashboard);
+                    // À l'affichage, le premier ordre libre est proposé.
+                    const ordre =
+                      afficher && !ordresLibres.includes(actuel)
+                        ? String(ordresLibres[0] ?? "")
+                        : definition.ordre_dashboard;
+                    setDefinition({ ...definition, afficher_dashboard: afficher, ordre_dashboard: ordre });
+                  }}
                 />
                 Afficher sur le dashboard
               </label>
-              <Field label="Ordre sur le dashboard (1 à 99)" error={errors.ordre_dashboard}>
-                <TextInput
-                  type="number"
-                  min={1}
-                  max={99}
-                  step={1}
-                  value={definition.ordre_dashboard}
+              <Field label="Ordre sur le dashboard (1 à 10)" error={errors.ordre_dashboard}>
+                <Select
+                  aria-label="Ordre sur le dashboard"
+                  value={definition.afficher_dashboard ? definition.ordre_dashboard : ""}
                   disabled={!definition.afficher_dashboard}
                   onChange={(e) => setDefinition({ ...definition, ordre_dashboard: e.target.value })}
-                />
+                >
+                  {!definition.afficher_dashboard && <option value="">—</option>}
+                  {definition.afficher_dashboard && ordresLibres.length === 0 && (
+                    <option value="">Aucun ordre libre</option>
+                  )}
+                  {ordresLibres.map((o) => (
+                    <option key={o} value={String(o)}>
+                      {o}
+                    </option>
+                  ))}
+                </Select>
               </Field>
             </div>
+            {definition.afficher_dashboard && ordresLibres.length === 0 && (
+              <p role="alert" className="text-body-sm text-error">
+                Les 10 ordres sont pris : retirez d'abord un indicateur du dashboard.
+              </p>
+            )}
             <p className="text-[11px] text-on-surface-variant">
               La valeur se saisit ensuite pour chaque mois, avec « Saisir une valeur ».
             </p>

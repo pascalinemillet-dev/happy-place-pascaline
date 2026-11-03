@@ -54,3 +54,16 @@ describe("F4 révisée : évolution par rapport au mois précédent", () => {
     expect(dernierMoisTermine(new Date("2026-01-15T12:00:00Z"))).toBe("2025-12-01");
   });
 });
+
+describe("Unité en toutes lettres (2026-11-03)", () => {
+  test("délai en jours, séparé par une espace", () => {
+    expect(formatMetricValue(31, "jours")).toBe("31 jours");
+    expect(formatMetricValue(1.5, "jours")).toBe("1,5 jour");
+    expect(ecartText(-2, "jours")).toBe("−2 jours");
+    expect(ecartText(1, "jours")).toBe("+1 jour");
+  });
+  test("un symbole reste collé", () => {
+    expect(formatMetricValue(3, "j")).toBe("3j");
+    expect(ecartText(-2, "j")).toBe("−2 j");
+  });
+});
