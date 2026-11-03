@@ -159,8 +159,8 @@ SELECT k, l, v, u, t, c,
 -- Indicateurs affichés sur le dashboard (US43) : les deux de la V1, dans le même ordre
 UPDATE public.metrics SET afficher_dashboard = true, ordre_dashboard = 1 WHERE key = 'taux_placement';
 UPDATE public.metrics SET afficher_dashboard = true, ordre_dashboard = 2 WHERE key = 'missions_actives';
--- Sens favorable (F4 révisée) : un délai qui baisse est une bonne nouvelle
-UPDATE public.metrics SET sens_favorable = 'baisse' WHERE key = 'delai_moyen_recrutement';
+-- Sens favorable (F4 révisée) : un délai ou un nombre de postes ouverts qui baisse est une bonne nouvelle
+UPDATE public.metrics SET sens_favorable = 'baisse' WHERE key IN ('delai_moyen_recrutement', 'postes_ouverts');
 
 -- Le trigger d'historique a ajouté une ligne datée d'aujourd'hui : on la recale
 -- sur la date de mise à jour, et on retire les doublons de valeur inchangée.
