@@ -172,6 +172,19 @@ export function recapToHtml(r: RecapResult): string {
   );
 }
 
+/** E-mail complet du récap (US64 révisée) : le tableau dans une page, avec un pied de page. */
+export function recapToEmail(r: RecapResult): string {
+  return (
+    `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${esc(recapTitle(r))}</title></head>` +
+    `<body style="margin:0;padding:24px;background:#f3f2ef;">` +
+    `<div style="max-width:960px;margin:0 auto;background:#ffffff;border:1px solid #e6e6e1;padding:24px;">` +
+    recapToHtml(r) +
+    `<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#747878;margin-top:16px;">` +
+    `Vous recevez cet e-mail parce que vous l'avez demandé depuis « Préparer mon point d'équipe » dans HappyPlace.` +
+    `</div></div></body></html>`
+  );
+}
+
 /** Une soumission en attente depuis plus de 5 jours ouvrés (fictif) est signalée. */
 export const LATE_AFTER_WORKDAYS = 5;
 

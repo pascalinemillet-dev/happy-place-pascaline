@@ -255,6 +255,15 @@ export async function fetchTeamSubmissions(
   }));
 }
 
+/**
+ * US64 révisée : envoie le récap au manager connecté, par la table d'envoi et le scénario Make R7.
+ * La base choisit le destinataire (le manager lui-même) : l'app ne peut pas viser une autre adresse.
+ */
+export async function sendTeamRecapEmail(objet: string, html: string) {
+  const { error } = await db.rpc("send_team_recap_email", { _objet: objet, _html: html });
+  if (error) throw error;
+}
+
 /* ---------- US68 : modifier et renvoyer une soumission refusée, ou l'archiver ---------- */
 
 export type ResubmitInput = {

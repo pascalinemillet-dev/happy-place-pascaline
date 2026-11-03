@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { generateTeamRecap } from "@/lib/ai.functions";
-import { trackEvent } from "@/lib/f1";
+import { sendTeamRecapEmail, trackEvent } from "@/lib/f1";
 import {
   COLUMN_HINTS,
   COLUMN_LABELS,
@@ -13,6 +13,7 @@ import {
   cardMeta,
   cardText,
   itemsOf,
+  recapToEmail,
   recapToHtml,
   recapToText,
   showTeam,
@@ -44,8 +45,8 @@ async function copyRecap(r: RecapResult): Promise<"html" | "text"> {
 /**
  * Panneau « Préparer mon point d'équipe » (US64), révisé le 2026-11-03 : tableau Kanban
  * « En attente », « Publiée », « Refusée », une couleur par type, une phrase de l'IA par carte.
- * « Copier » et « M'envoyer par e-mail » gardent la mise en forme (HTML dans le presse-papiers) ;
- * l'e-mail n'est pas envoyé par l'app : il part de la messagerie du manager quand il clique sur Envoyer.
+ * « Copier » met le récap en HTML et en texte dans le presse-papiers ; « M'envoyer par e-mail »
+ * l'envoie au manager par la table d'envoi et Make (décision de Pascaline du 2026-11-03).
  */
 export function TeamRecapPanel({
   open,
@@ -87,29 +88,20 @@ export function TeamRecapPanel({
     }
   }
 
-  async function mail() {
-    if (!r) return;
-    let kind: "html" | "text" | null = null;
-    try {
-      kind = await copyRecap(r);
-    } catch {
-      kind = null;
-    }
-    const subject = `Point d'équipe · ${r.teams.join(", ")}`;
-    // Un lien mailto ne porte que du texte : le corps invite à coller la version mise en forme.
-    const body =
-      kind === "html"
-        ? "Collez ici le récap copié (Ctrl+V ou Cmd+V) : il garde ses colonnes et ses couleurs.\n\n"
-        : recapToText(r);
-    window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    toast.info(
-      kind === "html"
-        ? "Votre messagerie s'ouvre : collez le récap, puis cliquez sur Envoyer. Rien n'est envoyé avant."
-        : "Votre messagerie s'ouvre avec le récap en texte : cliquez sur Envoyer. Rien n'est envoyé avant.",
-      { duration: 8000 },
-    );
-    trackEvent("team_recap_generated", "point_equipe", { emailed: true });
-  }
+  // US64 révisée (décision de Pascaline du 2026-11-03) : l'e-mail part par Make, au manager lui-même.
+  const send = useMutation({
+    mutationFn: (res: RecapResult) =>
+      sendTeamRecapEmail(`Point d'équipe · ${res.teams.join(", ")}`, recapToEmail(res)),
+    onSuccess: () => {
+      toast.success(
+        `Récap envoyé à ${email} : il arrive en général en moins d'une minute. S'il n'arrive pas, utilisez « Copier ».`,
+        { duration: 8000 },
+      );
+      trackEvent("team_recap_generated", "point_equipe", { emailed: true });
+    },
+    onError: (e: unknown) =>
+      toast.error(`L'e-mail n'a pas pu être envoyé : ${(e as Error).message}`, { duration: 8000 }),
+  });
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
@@ -202,8 +194,8 @@ export function TeamRecapPanel({
 
           <div className="space-y-xs border-t border-outline-variant p-md">
             <p className="text-[11px] text-on-surface-variant">
-              « M'envoyer par e-mail » copie le récap mis en forme et ouvre votre messagerie :
-              l'e-mail n'est pas envoyé par HappyPlace. Collez le récap, puis cliquez sur Envoyer.
+              « M'envoyer par e-mail » vous envoie ce récap, mis en forme, à {email}. Relisez-le
+              avant de le transférer. S'il n'arrive pas dans quelques minutes, utilisez « Copier ».
             </p>
             <div className="flex flex-wrap gap-xs">
               <button
@@ -216,11 +208,11 @@ export function TeamRecapPanel({
               </button>
               <button
                 type="button"
-                disabled={!r}
-                onClick={mail}
+                disabled={!r || send.isPending}
+                onClick={() => r && send.mutate(r)}
                 className="border border-outline px-sm py-xs font-label-sm text-label-sm text-primary hover:bg-surface-container disabled:opacity-50"
               >
-                M'ENVOYER PAR E-MAIL
+                {send.isPending ? "ENVOI…" : "M'ENVOYER PAR E-MAIL"}
               </button>
               <button
                 type="button"

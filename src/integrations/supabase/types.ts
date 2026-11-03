@@ -618,6 +618,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      send_team_recap_email: {
+        Args: { _objet: string; _html: string }
+        Returns: undefined
+      }
       archive_submission: {
         Args: { _submission_id: string }
         Returns: undefined
