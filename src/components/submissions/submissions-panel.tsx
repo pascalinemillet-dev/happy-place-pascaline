@@ -89,7 +89,8 @@ export function SubmissionsPanel({
             >
               <span
                 aria-hidden="true"
-                className="material-symbols-outlined text-[18px] leading-none"
+                className="material-symbols-outlined"
+                style={{ fontSize: 18 }}
               >
                 groups
               </span>

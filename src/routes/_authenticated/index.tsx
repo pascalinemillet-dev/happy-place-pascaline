@@ -64,9 +64,14 @@ export const Route = createFileRoute("/_authenticated/")({
 const PERF_IMAGE =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuAz-Y4URSqOCzUaVC6vomdu54tTiFPC_bF9A_h0SjxJ1mq2OlNfOyeKTNkPIgtPRloYwE5JrWFm2FHBNUq0GScs0ALDVMiq16FLu95dHNGPjmybEoIb2uyz1OGozRn0XkudSMukcPY4gKfeOJMR_KAnhYbkZifswTCbpCs_aHZyMuoZRz_oc4KsWtWiryTdwVD0EKyvxScj3palbDIM2wMlnH0njPGj912mRwhMmTo3Yu07l6xfVv2Zuw";
 
-function Icon({ name, className = "" }: { name: string; className?: string }) {
+// `size` : la règle .material-symbols-outlined (20 px, hors couche utilitaire) l'emporte sur text-[…].
+function Icon({ name, className = "", size }: { name: string; className?: string; size?: number }) {
   return (
-    <span aria-hidden="true" className={`material-symbols-outlined ${className}`}>
+    <span
+      aria-hidden="true"
+      className={`material-symbols-outlined ${className}`}
+      style={size ? { fontSize: size } : undefined}
+    >
       {name}
     </span>
   );
@@ -319,7 +324,7 @@ function ManagerSpace() {
                         onClick={() => setDraftsOpen(true)}
                         className="flex items-center gap-1 px-xs py-1 border border-outline bg-surface text-primary font-label-sm text-label-sm hover:bg-surface-container"
                       >
-                        <Icon name="draft" className="text-[14px] leading-none" /> BROUILLONS ({drafts})
+                        <Icon name="draft" size={14} /> BROUILLONS ({drafts})
                       </button>
                     )}
                     <button
@@ -331,7 +336,7 @@ function ManagerSpace() {
                       }}
                       className="flex items-center gap-1 px-xs py-1 border border-primary bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90"
                     >
-                      <Icon name="add" className="text-[14px] leading-none" /> CRÉER UNE ACTUALITÉ
+                      <Icon name="add" size={14} /> CRÉER UNE ACTUALITÉ
                     </button>
                   </div>
                 )}

@@ -426,7 +426,7 @@ function BlockerCard({
           className="flex w-full items-center justify-between gap-xs border-t border-outline-variant pt-xs font-label-sm text-label-sm text-primary uppercase hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           À valider
-          <span aria-hidden="true" className="material-symbols-outlined text-[18px] leading-none">
+          <span aria-hidden="true" className="material-symbols-outlined" style={{ fontSize: 18 }}>
             {open ? "expand_less" : "expand_more"}
           </span>
         </button>
