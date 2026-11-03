@@ -80,7 +80,8 @@ async function askAi(
     }
     // Make répond « Accepted » quand le scénario est arrêté ou que le filtre a bloqué l'appel :
     // ce n'est pas une réponse de l'IA.
-    if (typeof reponse !== "string" || !reponse.trim() || reponse.trim() === "Accepted") return null;
+    if (typeof reponse !== "string" || !reponse.trim() || reponse.trim() === "Accepted")
+      return null;
     return reponse.trim();
   } catch (e) {
     console.error("[make-ia]", tache, (e as Error).name);
@@ -109,8 +110,10 @@ export const PROMPT_TITRE =
 /** Consigne du récap (US64) : versionnée ici, envoyée à Make à chaque appel. */
 export const PROMPT_RECAP =
   "Tu prépares le point d'équipe d'un manager. Tu reçois une liste d'éléments en JSON. " +
-  "Pour chaque élément, écris UNE phrase en français de 25 mots au plus qui dit ce que c'est " +
-  "et ce qu'il faut en retenir. N'indique ni équipe ni durée : l'application les ajoute. " +
+  "Chaque élément est une carte d'un tableau en 3 colonnes (en attente, publiée, refusée), " +
+  "qui affiche déjà son type et son titre. Pour chaque élément, écris UNE phrase en français " +
+  "de 12 mots au plus qui dit ce qu'il faut en retenir, sans répéter le titre ni le type, " +
+  "sans commencer par « C'est ». N'indique ni équipe, ni durée, ni statut : l'application les ajoute. " +
   "Reprends seulement les faits du titre et de la description : n'ajoute ni cause, ni conséquence, " +
   "ni urgence, ni détail qui n'y figure pas. Si un élément est vague, la phrase reste vague. " +
   "N'écris jamais de nom ni de prénom de personne, même si une description en contient : " +
@@ -174,95 +177,104 @@ export const generateTeamRecap = createServerFn({ method: "POST" })
     if (teams.length === 0)
       throw new Error("Le récap est réservé aux managers qui ont une équipe.");
     const lower = new Set(teams.map((t) => t.toLowerCase()));
+    const mine = (team: string) => lower.has(team.toLowerCase());
     const week = sinceDays(7);
     const drafts: Draft[] = [];
 
+    // Colonne « En attente » : toutes les soumissions à traiter des équipes du manager.
     const { data: pending } = await supabase
       .from("submissions")
       .select("id, kind, team, content, severity, proposed_title, created_at")
       .eq("status", "en attente");
     for (const s of pending ?? []) {
-      if (!lower.has(s.team.toLowerCase())) continue;
+      if (!mine(s.team)) continue;
       drafts.push({
         id: `s-${s.id}`,
-        rubric: "attend",
+        column: "attente",
         team: s.team,
         type: s.kind,
         title: s.proposed_title || excerptOf(s.content),
         excerpt: excerptOf(s.content),
         severity: s.severity,
+        blockerStatus: null,
         since: s.created_at,
         late: isLate(s.created_at),
         detail: s.content.slice(0, MAX_DETAIL),
       });
     }
 
+    // Colonne « Publiée » : points bloquants encore ouverts, quelle que soit leur date,
+    // et points publiés ou résolus depuis 7 jours. Un point n'apparaît qu'une fois.
     const { data: blockers } = await supabase
       .from("blockers")
       .select("id, title, description, department, severity, status, created_at, updated_at");
     for (const b of blockers ?? []) {
-      if (!lower.has(b.department.toLowerCase())) continue;
-      const base = {
+      if (!mine(b.department)) continue;
+      const resolved = b.status === "RÉSOLU";
+      const recent = b.created_at >= week || (resolved && b.updated_at >= week);
+      if (resolved && !recent) continue;
+      drafts.push({
+        id: `b-${b.id}`,
+        column: "publiee",
         team: b.department,
-        type: "point bloquant" as const,
+        type: "point bloquant",
         title: b.title,
         excerpt: excerptOf(b.description || b.title),
         severity: b.severity,
+        blockerStatus: b.status,
+        since: resolved ? b.updated_at : b.created_at,
         late: false,
         detail: (b.description ?? "").slice(0, MAX_DETAIL),
-      };
-      if (b.status !== "RÉSOLU") {
-        drafts.push({ ...base, id: `b-${b.id}`, rubric: "bloque", since: b.created_at });
-      }
-      if (b.created_at >= week || (b.status === "RÉSOLU" && b.updated_at >= week)) {
-        drafts.push({
-          ...base,
-          id: `a-${b.id}`,
-          rubric: "avance",
-          since: b.status === "RÉSOLU" ? b.updated_at : b.created_at,
-          title: b.status === "RÉSOLU" ? `${b.title} (résolu)` : `${b.title} (publié)`,
-          excerpt: `${base.excerpt} (${b.status === "RÉSOLU" ? "résolu" : "publié"})`,
-        });
-      }
+      });
     }
 
+    // Idées publiées (validées) et soumissions refusées depuis 7 jours, d'après l'historique.
     const { data: hist } = await supabase
       .from("submission_status_history")
-      .select("submission_id, changed_at")
-      .eq("new_status", "validée")
-      .gte("changed_at", week);
-    const validatedIds = [...new Set((hist ?? []).map((h) => h.submission_id))];
-    if (validatedIds.length) {
-      const { data: ideas } = await supabase
+      .select("submission_id, new_status, changed_at")
+      .in("new_status", ["validée", "refusée"])
+      .gte("changed_at", week)
+      .order("changed_at", { ascending: false });
+    const lastChange = new Map<string, { status: string; at: string }>();
+    for (const h of hist ?? []) {
+      if (!lastChange.has(h.submission_id))
+        lastChange.set(h.submission_id, { status: h.new_status, at: h.changed_at });
+    }
+    if (lastChange.size) {
+      const { data: decided } = await supabase
         .from("submissions")
-        .select("id, team, content, created_at")
-        .in("id", validatedIds)
-        .eq("kind", "idée");
-      for (const s of ideas ?? []) {
-        if (!lower.has(s.team.toLowerCase())) continue;
+        .select("id, kind, team, content, severity, status, created_at")
+        .in("id", [...lastChange.keys()]);
+      for (const s of decided ?? []) {
+        if (!mine(s.team)) continue;
+        const change = lastChange.get(s.id);
+        // L'état actuel fait foi : une soumission refusée puis renvoyée n'est plus « refusée ».
+        if (!change || change.status !== s.status) continue;
+        if (s.status === "validée" && s.kind !== "idée") continue; // déjà compté via blockers
         drafts.push({
-          id: `v-${s.id}`,
-          rubric: "avance",
+          id: `${s.status === "validée" ? "v" : "r"}-${s.id}`,
+          column: s.status === "validée" ? "publiee" : "refusee",
           team: s.team,
-          type: "idée",
-          title: `${excerptOf(s.content)} (validée)`,
-          excerpt: `${excerptOf(s.content)} (validée)`,
-          severity: null,
-          since: hist?.find((h) => h.submission_id === s.id)?.changed_at ?? s.created_at,
+          type: s.kind,
+          title: excerptOf(s.content),
+          excerpt: excerptOf(s.content),
+          severity: s.severity,
+          blockerStatus: null,
+          since: change.at,
           late: false,
           detail: s.content.slice(0, MAX_DETAIL),
         });
       }
     }
 
-    // Make et l'IA ne reçoivent ni nom, ni e-mail, ni équipe, ni durée : seulement l'id, la rubrique,
+    // Make et l'IA ne reçoivent ni nom, ni e-mail, ni équipe, ni durée : seulement l'id, la colonne,
     // le type, la sévérité, le titre et la description.
     const texts = new Map<string, string>();
     let ai = false;
     if (drafts.length && aiEnabled()) {
       const payload = drafts.map((d) => ({
         id: d.id,
-        rubrique: d.rubric,
+        colonne: d.column,
         type: d.type,
         severite: d.severity,
         titre: d.title,
@@ -284,9 +296,13 @@ export const generateTeamRecap = createServerFn({ method: "POST" })
       }
     }
 
-    const items: RecapItem[] = drafts.map(({ detail: _detail, ...d }) => ({
-      ...d,
-      text: ai ? (texts.get(d.id) ?? null) : null,
-    }));
+    // Dans chaque colonne : points bloquants d'abord (US63), puis du plus récent au plus ancien.
+    const items: RecapItem[] = drafts
+      .map(({ detail: _detail, ...d }) => ({ ...d, text: ai ? (texts.get(d.id) ?? null) : null }))
+      .sort(
+        (a, b) =>
+          Number(a.type !== "point bloquant") - Number(b.type !== "point bloquant") ||
+          b.since.localeCompare(a.since),
+      );
     return { generatedAt: new Date().toISOString(), ai, teams, items };
   });
