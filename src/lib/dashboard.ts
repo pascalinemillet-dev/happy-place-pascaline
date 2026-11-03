@@ -365,20 +365,24 @@ export async function saveDraftNews(input: {
   author_email: string;
   links: NewsLink[];
   media: MediaDraft;
-}) {
-  const payload = {
+}): Promise<string> {
+  const content = {
     title: input.title,
     body: input.body,
-    author: input.author,
-    author_email: input.author_email.toLowerCase(),
     status: "brouillon" as const,
     links: input.links as unknown as Json,
   };
+  // US66 : modifier un brouillon garde son auteur (l'admin peut reprendre celui d'un manager).
   const { data, error } = input.id
-    ? await db.from("news").update(payload).eq("id", input.id).select("id").single()
-    : await db.from("news").insert(payload).select("id").single();
+    ? await db.from("news").update(content).eq("id", input.id).select("id").single()
+    : await db
+        .from("news")
+        .insert({ ...content, author: input.author, author_email: input.author_email.toLowerCase() })
+        .select("id")
+        .single();
   if (error) throw error;
   await applyNewsImage(data.id, input.media);
+  return data.id;
 }
 
 export async function publishDraftNews(id: string) {
