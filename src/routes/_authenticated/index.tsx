@@ -11,7 +11,7 @@ import { DepartureNotices } from "@/components/departure-notices";
 import { NewsImage, NewsLinks } from "@/components/news-media";
 import { NewsDraftsModal, NewsEditorModal } from "@/components/news-modals";
 import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
-import { PendingQueue } from "@/components/submissions/pending-queue";
+import { SubmissionsPanel } from "@/components/submissions/submissions-panel";
 import { MySubmissions, SHOW_ALL_EVENT } from "@/components/submissions/my-submissions";
 import { SubmitModal, type SentSubmission } from "@/components/submissions/submit-modal";
 import { TeamRecapPanel } from "@/components/submissions/team-recap-panel";
@@ -380,19 +380,14 @@ function ManagerSpace() {
           </section>
 
           {canReview ? (
-            <>
-              {/* Soumissions en attente (US63) : la file à traiter du manager et de l'admin */}
-              <section className="col-span-12 lg:col-span-4 min-w-0 bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
-                <PendingQueue
-                  role={role}
-                  mode="manager"
-                  onPrepareRecap={role === "manager" ? () => setRecapOpen(true) : undefined}
-                />
-              </section>
-
-              {/* Mes soumissions, masqué tant que le manager ou l'admin n'a rien soumis */}
-              <MySubmissions role={role} email={myEmail} onRead={setReading} hideWhenEmpty />
-            </>
+            /* Manager et admin (US70) : un bloc, deux vues, « Soumissions d'équipes » et « Mes soumissions » */
+            <SubmissionsPanel
+              role={role}
+              email={myEmail}
+              managerTeams={role === "admin" ? null : myTeams.data}
+              onRead={setReading}
+              onPrepareRecap={role === "manager" ? () => setRecapOpen(true) : undefined}
+            />
           ) : (
             /* Collaborateur (US67) : un seul bloc, à la place de « Soumissions en attente » */
             <MySubmissions role={role} email={myEmail} onRead={setReading} layout="colonne" />

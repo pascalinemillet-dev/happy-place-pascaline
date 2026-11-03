@@ -95,12 +95,15 @@ export async function publishBlocker(input: {
   title: string;
   department: string;
   severity: BlockerSeverity;
+  /** US71 : description reformulée pour le point publié ; absente, le texte de l'auteur est repris. */
+  description?: string | null;
 }): Promise<string> {
   const { data, error } = await db.rpc("publish_blocker_submission", {
     _submission_id: input.submissionId,
     _title: input.title,
     _department: input.department,
     _severity: input.severity,
+    _description: input.description ?? null,
   });
   if (error) throw error;
   return data;
@@ -133,16 +136,6 @@ export const MY_STATUS_LABELS: Record<Exclude<MyStatusFilter, "tous" | "archivé
   validée: "publiée",
   refusée: "refusée",
 };
-
-/** Nombre total de soumissions de l'auteur, tous statuts et types confondus (US67). */
-export async function countMySubmissions(email: string): Promise<number> {
-  const { count, error } = await db
-    .from("submissions")
-    .select("id", { count: "exact", head: true })
-    .ilike("submitted_by_email", email);
-  if (error) throw error;
-  return count ?? 0;
-}
 
 /**
  * « Mes soumissions » : type, statut, date du dernier changement, statut du point créé (US33).
@@ -200,6 +193,29 @@ export async function fetchMySubmissionsDetailed(
       blocker_updated_at: b?.updated_at ?? null,
     };
   });
+}
+
+/**
+ * US70 : vue « Soumissions d'équipes » hors « En attente », en lecture seule.
+ * Manager : ses équipes seulement (la base laisse aussi lire les idées validées de tout le cabinet) ;
+ * admin (`teams` à null) : toutes les équipes. Les 20 plus récentes du filtre choisi.
+ */
+export async function fetchTeamSubmissions(
+  teams: string[] | null,
+  filters: { status: MyStatusFilter; kind: "tous" | SubmissionKind },
+): Promise<Submission[]> {
+  let query = db.from("submissions").select("*");
+  if (teams) query = query.in("team", teams);
+  if (filters.status === "archivée") {
+    query = query.eq("status", "refusée").not("archived_at", "is", null);
+  } else {
+    query = query.is("archived_at", null);
+    if (filters.status !== "tous") query = query.eq("status", filters.status);
+  }
+  if (filters.kind !== "tous") query = query.eq("kind", filters.kind);
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(20);
+  if (error) throw error;
+  return (data ?? []) as Submission[];
 }
 
 /* ---------- US68 : modifier et renvoyer une soumission refusée, ou l'archiver ---------- */

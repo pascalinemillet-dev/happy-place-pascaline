@@ -55,19 +55,25 @@ export function KindTag({ kind }: { kind: Submission["kind"] }) {
  * Soumissions en attente (US63) : points bloquants en tête, compteur par type, filtre par type.
  * - mode « manager » : ce que la base laisse lire (équipes du manager ; admin : tout) ;
  * - mode « admin » : file de l'admin, option A (points bloquants + idées des équipes sans manager).
+ * US70 : avec `kindFilter`, la file s'affiche dans le bloc unique du dashboard (vue « Soumissions
+ * d'équipes », statut « En attente ») ; le titre, le bouton du récap et les filtres viennent du bloc.
  */
 export function PendingQueue({
   role,
   mode,
   onPrepareRecap,
+  kindFilter,
 }: {
   role: string;
   mode: "manager" | "admin";
   onPrepareRecap?: () => void;
+  kindFilter?: QueueFilter;
 }) {
   const qc = useQueryClient();
   const canReview = role === "admin" || role === "manager";
-  const [filter, setFilter] = useState<QueueFilter>("tous");
+  const embedded = kindFilter !== undefined;
+  const [ownFilter, setFilter] = useState<QueueFilter>("tous");
+  const filter = kindFilter ?? ownFilter;
   const [reading, setReading] = useState<Submission | null>(null);
   const [rejecting, setRejecting] = useState<Submission | null>(null);
 
@@ -126,10 +132,20 @@ export function PendingQueue({
     </div>
   );
 
+  const countsLine = (
+    <p
+      className="mb-sm font-label-sm text-label-sm text-on-surface-variant uppercase"
+      aria-live="polite"
+    >
+      À traiter : {counts.blockers} point{counts.blockers > 1 ? "s" : ""} bloquant
+      {counts.blockers > 1 ? "s" : ""} · {counts.ideas} idée{counts.ideas > 1 ? "s" : ""}
+    </p>
+  );
+
   return (
     <>
-      {heading}
-      {onPrepareRecap && (
+      {embedded ? countsLine : heading}
+      {!embedded && onPrepareRecap && (
         <button
           type="button"
           onClick={onPrepareRecap}
@@ -138,23 +154,25 @@ export function PendingQueue({
           PRÉPARER MON POINT D'ÉQUIPE
         </button>
       )}
-      <div role="group" aria-label="Filtrer par type" className="mb-sm flex flex-wrap gap-xs">
-        {FILTERS.map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            aria-pressed={filter === f.value}
-            onClick={() => setFilter(f.value)}
-            className={`px-sm py-0.5 border font-label-sm text-label-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-              filter === f.value
-                ? "bg-primary text-on-primary border-primary"
-                : "border-outline-variant text-on-surface-variant hover:bg-surface-container"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      {!embedded && (
+        <div role="group" aria-label="Filtrer par type" className="mb-sm flex flex-wrap gap-xs">
+          {FILTERS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              aria-pressed={filter === f.value}
+              onClick={() => setFilter(f.value)}
+              className={`px-sm py-0.5 border font-label-sm text-label-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                filter === f.value
+                  ? "bg-primary text-on-primary border-primary"
+                  : "border-outline-variant text-on-surface-variant hover:bg-surface-container"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="space-y-sm flex-grow min-w-0">
         {pending.isError && (
@@ -318,6 +336,11 @@ function BlockerCard({
   const [aiTitle, setAiTitle] = useState<string | null>(
     s.proposed_title_by_ai ? (s.proposed_title ?? null) : null,
   );
+  // US70 : la partie « À valider » est repliée par défaut, ouverte par une flèche.
+  const [open, setOpen] = useState(false);
+  // US71 : la description publiée peut être reformulée ; la soumission garde le texte de l'auteur.
+  const [description, setDescription] = useState(s.content);
+  const panelId = `a-valider-${s.id}`;
 
   // Titre proposé par l'IA (US31) : une seule demande par carte, seule la description part à l'IA.
   const suggestion = useQuery({
@@ -346,7 +369,13 @@ function BlockerCard({
 
   const publish = useMutation({
     mutationFn: () =>
-      publishBlocker({ submissionId: s.id, title: title.trim(), department, severity }),
+      publishBlocker({
+        submissionId: s.id,
+        title: title.trim(),
+        department,
+        severity,
+        description: description.trim() !== s.content.trim() ? description.trim() : null,
+      }),
     onSuccess: () => {
       const edited = !!aiTitle && aiTitle !== title.trim();
       if (edited) trackEvent("ai_suggestion_edited", "soumissions", { edited: true });
@@ -365,15 +394,13 @@ function BlockerCard({
   });
 
   const titleTooShort = title.trim().length < 3;
+  const descriptionInvalid = description.trim().length < 5 || description.trim().length > 2000;
   const suggesting = suggestion.isLoading && !title;
 
   return (
     <div className="p-sm border border-outline-variant bg-card space-y-sm min-w-0 overflow-hidden">
       <CardHead s={s} />
       <div className="space-y-xs">
-        <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-          Assigné à : {assigned}
-        </p>
         <SubmissionPreview content={s.content} onOpen={onRead} />
         <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
         <div className="flex flex-wrap gap-xs">
@@ -391,8 +418,25 @@ function BlockerCard({
       </div>
 
       {canReview && (
-        <div className="space-y-xs bg-surface-container-low p-sm">
-          <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">À valider</p>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={() => setOpen((o) => !o)}
+          className="flex w-full items-center justify-between gap-xs border-t border-outline-variant pt-xs font-label-sm text-label-sm text-primary uppercase hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          À valider
+          <span aria-hidden="true" className="material-symbols-outlined text-[18px] leading-none">
+            {open ? "expand_less" : "expand_more"}
+          </span>
+        </button>
+      )}
+
+      {canReview && open && (
+        <div id={panelId} className="space-y-xs bg-surface-container-low p-sm">
+          <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
+            Assigné à : {assigned}
+          </p>
           <div className="space-y-1">
             <label className="flex flex-wrap items-center gap-xs font-label-sm text-label-sm text-on-surface-variant uppercase">
               Titre
@@ -416,6 +460,21 @@ function BlockerCard({
               </p>
             )}
           </div>
+          <label className="block font-label-sm text-label-sm text-on-surface-variant uppercase">
+            Description publiée
+            <textarea
+              rows={4}
+              value={description}
+              maxLength={2000}
+              onChange={(e) => setDescription(e.target.value)}
+              className="mt-1 w-full border border-outline-variant bg-card p-xs font-body-sm normal-case text-on-surface focus:border-primary focus:outline-none"
+            />
+          </label>
+          <p className="text-body-sm text-on-surface-variant">
+            {descriptionInvalid
+              ? "La description doit faire de 5 à 2000 caractères."
+              : "Vous pouvez la reformuler : l'auteur garde son texte dans « Mes soumissions »."}
+          </p>
           <label className="block font-label-sm text-label-sm text-on-surface-variant uppercase">
             Pôle
             <select
@@ -457,7 +516,7 @@ function BlockerCard({
             </button>
             <button
               type="button"
-              disabled={publish.isPending || titleTooShort}
+              disabled={publish.isPending || titleTooShort || descriptionInvalid}
               onClick={() => publish.mutate()}
               className="flex-1 py-1 bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 transition-colors disabled:opacity-50"
             >

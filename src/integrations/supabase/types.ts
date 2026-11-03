@@ -603,6 +603,7 @@ export type Database = {
           _title: string
           _department: string
           _severity: Database["public"]["Enums"]["blocker_severity"]
+          _description?: string | null
         }
         Returns: string
       }

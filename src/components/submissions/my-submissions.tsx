@@ -14,7 +14,6 @@ import {
   MY_STATUS_LABELS,
   archiveSubmission,
   assigneeLine,
-  countMySubmissions,
   fetchAssigneeNames,
   fetchMySubmissionsDetailed,
   type MySubmission,
@@ -23,7 +22,7 @@ import {
 import { useModuleViewed } from "@/lib/use-module-viewed";
 import { ModuleHint, hintId } from "@/components/module-hint";
 
-function statusBadge(s: MySubmission): { label: string; className: string } {
+export function statusBadge(s: Submission): { label: string; className: string } {
   if (s.status === "refusée" && s.archived_at)
     return {
       label: "ARCHIVÉE",
@@ -59,7 +58,16 @@ const STATUS_OPTIONS: { value: MyStatusFilter; label: string }[] = [
 ];
 
 /** Message quand le filtre ne renvoie rien, accordé au type choisi. */
-function emptyMessage(status: MyStatusFilter, kind: "tous" | SubmissionKind): string {
+export function emptyMessage(
+  status: MyStatusFilter,
+  kind: "tous" | SubmissionKind,
+  scope: "mine" | "equipes" = "mine",
+): string {
+  if (status === "tous" && scope === "equipes") {
+    if (kind === "idée") return "Aucune idée.";
+    if (kind === "point bloquant") return "Aucun point bloquant.";
+    return "Aucune soumission.";
+  }
   if (status === "tous") {
     if (kind === "idée") return "Vous n'avez soumis aucune idée.";
     if (kind === "point bloquant") return "Vous n'avez signalé aucun point bloquant.";
@@ -84,6 +92,50 @@ const selectClass =
 const labelClass =
   "flex items-center gap-xs font-label-sm text-label-sm text-on-surface-variant uppercase";
 
+/** Filtres Statut et Type (US67), partagés par « Mes soumissions » et « Soumissions d'équipes » (US70). */
+export function SubmissionFilters({
+  status,
+  onStatus,
+  type,
+  onType,
+}: {
+  status: MyStatusFilter;
+  onStatus: (s: MyStatusFilter) => void;
+  type: "tous" | SubmissionKind;
+  onType: (t: "tous" | SubmissionKind) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-sm">
+      <label className={labelClass}>
+        Statut
+        <select
+          value={status}
+          onChange={(e) => onStatus(e.target.value as MyStatusFilter)}
+          className={selectClass}
+        >
+          {STATUS_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className={labelClass}>
+        Type
+        <select
+          value={type}
+          onChange={(e) => onType(e.target.value as "tous" | SubmissionKind)}
+          className={selectClass}
+        >
+          <option value="tous">Tous les types</option>
+          <option value="point bloquant">{KIND_LABELS["point bloquant"]}</option>
+          <option value="idée">{KIND_LABELS["idée"]}</option>
+        </select>
+      </label>
+    </div>
+  );
+}
+
 /**
  * Bloc « Mes soumissions » : type, statut, date du dernier changement, statut du point créé (US33).
  * US67 : filtres Statut (en attente par défaut) et Type. Sur la page du collaborateur, ce bloc
@@ -95,20 +147,20 @@ export function MySubmissions({
   email,
   onRead,
   layout = "pleine",
-  hideWhenEmpty = false,
+  embedded = false,
 }: {
   role: string;
   email: string;
   onRead: (s: Submission) => void;
   layout?: "pleine" | "colonne";
-  /** Manager et admin : le bloc reste masqué tant qu'ils n'ont rien soumis. */
-  hideWhenEmpty?: boolean;
+  /** US70 : vue « Mes soumissions » du bloc unique du manager et de l'admin, sans titre propre. */
+  embedded?: boolean;
 }) {
   const [status, setStatus] = useState<MyStatusFilter>("en attente");
   const [type, setType] = useState<"tous" | SubmissionKind>("tous");
   const [editing, setEditing] = useState<MySubmission | null>(null);
   const [archiving, setArchiving] = useState<MySubmission | null>(null);
-  const ref = useModuleViewed<HTMLElement>("mes_soumissions");
+  const ref = useModuleViewed<HTMLDivElement>("mes_soumissions");
   const qc = useQueryClient();
 
   // US68 : archiver une soumission refusée (elle reste lisible dans « Archivée »).
@@ -141,68 +193,29 @@ export function MySubmissions({
     };
   }, []);
 
-  const total = useQuery({
-    queryKey: ["submissions", "mine", email, "total"],
-    queryFn: () => countMySubmissions(email),
-    enabled: !!email && hideWhenEmpty,
-    retry: false,
-  });
   const q = useQuery({
     queryKey: ["submissions", "mine", email, status, type],
     queryFn: () => fetchMySubmissionsDetailed(email, { status, kind: type }),
     enabled: !!email,
     retry: false,
   });
-  if (hideWhenEmpty && !total.data) return null;
   const rows = q.data ?? [];
   const column = layout === "colonne";
 
-  return (
-    <section
-      id="mes-soumissions"
-      ref={ref}
-      aria-describedby={hintId("mes-soumissions")}
-      className={`${
-        column ? "col-span-12 lg:col-span-4 flex flex-col" : "col-span-12"
-      } min-w-0 bg-surface-container-lowest border border-outline-variant p-md`}
-    >
+  const body = (
+    <>
       <div
         className={`flex flex-wrap gap-sm border-b border-outline-variant pb-sm mb-md ${
-          column ? "flex-col" : "items-center justify-between"
+          column || embedded ? "flex-col" : "items-center justify-between"
         }`}
       >
-        <div>
-          <h2 className="font-headline-sm text-headline-sm text-primary">Mes soumissions</h2>
-          <ModuleHint module="mes-soumissions" />
-        </div>
-        <div className="flex flex-wrap items-center gap-sm">
-          <label className={labelClass}>
-            Statut
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as MyStatusFilter)}
-              className={selectClass}
-            >
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={labelClass}>
-            Type
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value as "tous" | SubmissionKind)}
-              className={selectClass}
-            >
-              <option value="tous">Tous les types</option>
-              <option value="point bloquant">{KIND_LABELS["point bloquant"]}</option>
-              <option value="idée">{KIND_LABELS["idée"]}</option>
-            </select>
-          </label>
-        </div>
+        {!embedded && (
+          <div>
+            <h2 className="font-headline-sm text-headline-sm text-primary">Mes soumissions</h2>
+            <ModuleHint module="mes-soumissions" />
+          </div>
+        )}
+        <SubmissionFilters status={status} onStatus={setStatus} type={type} onType={setType} />
       </div>
       <div aria-live="polite" className="sr-only">
         {q.data
@@ -333,6 +346,20 @@ export function MySubmissions({
           </div>
         </Modal>
       )}
+    </>
+  );
+
+  if (embedded) return <div ref={ref}>{body}</div>;
+  return (
+    <section
+      id="mes-soumissions"
+      ref={ref}
+      aria-describedby={hintId("mes-soumissions")}
+      className={`${
+        column ? "col-span-12 lg:col-span-4 flex flex-col" : "col-span-12"
+      } min-w-0 bg-surface-container-lowest border border-outline-variant p-md`}
+    >
+      {body}
     </section>
   );
 }
