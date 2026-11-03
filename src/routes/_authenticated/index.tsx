@@ -297,7 +297,7 @@ function ManagerSpace() {
                 <h2 className="font-headline-sm text-headline-sm text-primary">
                   Actualités du cabinet
                 </h2>
-                {canWriteNews ? (
+                {canWriteNews && (
                   <div className="flex flex-wrap items-center gap-xs">
                     {drafts > 0 && (
                       <button
@@ -321,10 +321,6 @@ function ManagerSpace() {
                       <Icon name="add" /> CRÉER UNE ACTUALITÉ
                     </button>
                   </div>
-                ) : (
-                  <span className="font-label-sm text-label-sm text-on-surface-variant">
-                    {drafts} brouillon{drafts > 1 ? "s" : ""} en attente
-                  </span>
                 )}
               </div>
               <ModuleHint module="actus" />
