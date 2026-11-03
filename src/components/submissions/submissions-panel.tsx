@@ -28,7 +28,7 @@ const VIEWS: { value: View; label: string }[] = [
  * - « Soumissions d'équipes » (par défaut) : « En attente » montre la file à traiter (US63) ;
  *   les autres statuts montrent les décisions passées, en lecture seule ;
  * - « Mes soumissions » : le suivi de ses propres soumissions (US67, US68).
- * Le manager garde « Préparer mon point d'équipe » (US64).
+ * Le manager garde « Préparer mon point d'équipe » (US64), en haut à droite du bloc, avec une icône.
  */
 export function SubmissionsPanel({
   role,
@@ -77,7 +77,25 @@ export function SubmissionsPanel({
       className="col-span-12 lg:col-span-4 min-w-0 bg-surface-container-lowest border border-outline-variant p-md flex flex-col"
     >
       <div className="border-b border-outline-variant pb-sm mb-sm space-y-xs">
-        <h2 className="font-headline-sm text-headline-sm text-primary">Soumissions</h2>
+        <div className="flex flex-wrap items-start justify-between gap-xs">
+          <h2 className="font-headline-sm text-headline-sm text-primary">Soumissions</h2>
+          {onPrepareRecap && (
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              onClick={onPrepareRecap}
+              className="flex items-center gap-xs border border-outline bg-surface px-sm py-xs font-label-sm text-label-sm text-primary hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined text-[18px] leading-none"
+              >
+                groups
+              </span>
+              PRÉPARER MON POINT D'ÉQUIPE
+            </button>
+          )}
+        </div>
         <div role="group" aria-label="Choisir la vue" className="flex flex-wrap gap-xs">
           {VIEWS.map((v) => (
             <button
@@ -97,16 +115,6 @@ export function SubmissionsPanel({
         </div>
         <ModuleHint module={hint} />
       </div>
-
-      {onPrepareRecap && (
-        <button
-          type="button"
-          onClick={onPrepareRecap}
-          className="mb-sm w-full border border-outline bg-surface px-sm py-xs font-label-md text-label-md text-primary hover:bg-surface-container"
-        >
-          PRÉPARER MON POINT D'ÉQUIPE
-        </button>
-      )}
 
       {view === "mine" ? (
         <MySubmissions role={role} email={email} onRead={onRead} embedded />
