@@ -27,6 +27,7 @@ import {
   type QueueFilter,
 } from "@/lib/f1";
 import { suggestBlockerTitle } from "@/lib/ai.functions";
+import { titreIaTropLong } from "@/lib/titre-ia";
 import { isLate } from "@/lib/recap";
 import { ModuleHint } from "@/components/module-hint";
 
@@ -343,16 +344,20 @@ function BlockerCard({
   const panelId = `a-valider-${s.id}`;
 
   // Titre proposé par l'IA (US31) : une seule demande par carte, seule la description part à l'IA.
+  // Révision du 2026-11-03 : un titre de l'IA de plus de 5 mots, proposé avant, est redemandé.
+  const ancienTitreIa = !!s.proposed_title_by_ai && titreIaTropLong(s.proposed_title);
   const suggestion = useQuery({
     queryKey: ["title-suggestion", s.id],
     queryFn: () => suggestBlockerTitle({ data: { submissionId: s.id } }),
-    enabled: canReview && !s.proposed_title,
+    enabled: canReview && (!s.proposed_title || ancienTitreIa),
     staleTime: Infinity,
     retry: false,
   });
   useEffect(() => {
     const r = suggestion.data;
-    if (r?.title && !title) {
+    // Remplace aussi l'ancien titre trop long de l'IA, tant que la personne ne l'a pas modifié.
+    const remplacable = !title || (ancienTitreIa && title === s.proposed_title);
+    if (r?.title && remplacable) {
       setTitle(r.title);
       if (r.byAi) setAiTitle(r.title);
     }

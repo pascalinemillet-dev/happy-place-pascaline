@@ -14,6 +14,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type { Database } from "@/integrations/supabase/types";
 import { excerptOf, isLate, type RecapItem, type RecapResult } from "@/lib/recap";
+import { nettoyerTitreIa, titreIaTropLong } from "@/lib/titre-ia";
 
 const MAX_DETAIL = 300;
 
@@ -101,7 +102,8 @@ function jsonPart(raw: string): string {
 /** Consigne du titre (US31) : versionnée ici, envoyée à Make à chaque appel. */
 export const PROMPT_TITRE =
   "Tu rédiges des titres de points bloquants pour un tableau de bord interne. " +
-  "Donne un titre factuel en français, 80 caractères au plus, sans point final ni guillemets. " +
+  "Résume la description en un titre factuel en français de 5 mots au plus : un groupe nominal, " +
+  "pas une phrase, sans point final ni guillemets. Garde le problème principal, laisse les détails. " +
   "Reprends seulement les faits de la description : n'ajoute ni cause, ni conséquence, ni détail " +
   "qui n'y figure pas. Si la description est vague, le titre reste vague. " +
   "N'écris jamais de nom ni de prénom de personne, même si la description en contient : " +
@@ -141,14 +143,22 @@ export const suggestBlockerTitle = createServerFn({ method: "POST" })
     if (!s || s.kind !== "point bloquant" || s.status !== "en attente") {
       return { title: null, byAi: false, state: "unavailable" };
     }
-    if (s.proposed_title)
+    // Un titre déjà proposé est réutilisé, sauf un titre de l'IA de plus de 5 mots, produit avant
+    // la révision du 2026-11-03 : il est redemandé. Un titre saisi à la main n'est jamais remplacé.
+    const ancienTitreIa = s.proposed_title_by_ai && titreIaTropLong(s.proposed_title);
+    if (s.proposed_title && !ancienTitreIa)
       return { title: s.proposed_title, byAi: s.proposed_title_by_ai, state: "ok" };
-    if (!aiEnabled()) return { title: null, byAi: false, state: "disabled" };
+    // Sans réponse de l'IA, l'ancien titre de l'IA reste proposé tel quel, comme avant la révision.
+    const repli = ancienTitreIa
+      ? { title: s.proposed_title, byAi: true, state: "ok" as const }
+      : null;
+    if (!aiEnabled()) return repli ?? { title: null, byAi: false, state: "disabled" };
 
     // Seule la description part chez Make et OpenAI, sans nom, e-mail ni équipe de l'auteur.
     const raw = await askAi("titre", PROMPT_TITRE, s.content.slice(0, 2000), false);
-    const title = raw?.replace(/^["«\s]+|["»\s.]+$/g, "").slice(0, 160) || null;
-    if (!title) return { title: null, byAi: false, state: "failed" };
+    // Garde-fou : 5 mots au plus, même si l'IA ne respecte pas la consigne.
+    const title = nettoyerTitreIa(raw);
+    if (!title) return repli ?? { title: null, byAi: false, state: "failed" };
     const { error } = await supabase.rpc("save_proposed_title", {
       _submission_id: s.id,
       _title: title,
