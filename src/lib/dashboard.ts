@@ -41,6 +41,8 @@ export type Submission = {
   resubmission_count?: number;
   archived_at?: string | null;
   first_submitted_at?: string | null;
+  /** Point bloquant publié : éléments modifiés par le manager ou l'admin à la publication. */
+  published_changes?: string[];
 };
 
 export type SubmissionKind = Enums["submission_kind"];

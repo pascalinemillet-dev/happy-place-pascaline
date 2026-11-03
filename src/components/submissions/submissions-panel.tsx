@@ -7,6 +7,7 @@ import { ModuleHint, hintId, type ModuleHintKey } from "@/components/module-hint
 import { KindTag, PendingQueue } from "@/components/submissions/pending-queue";
 import {
   MySubmissions,
+  PublishedChangesNote,
   SHOW_ALL_EVENT,
   SubmissionFilters,
   emptyMessage,
@@ -201,6 +202,7 @@ function TeamHistory({
             <p className="text-[11px] font-label-sm text-on-surface-variant uppercase mt-xs">
               {s.team} · envoyé le {formatExactDate(s.created_at)}
             </p>
+            {s.status === "validée" && <PublishedChangesNote changes={s.published_changes} />}
             {s.status === "refusée" && s.rejection_category && (
               <div className="mt-xs p-xs bg-error-container text-on-error-container text-body-sm wrap-anywhere">
                 <p className="font-bold">Motif : {s.rejection_category}</p>

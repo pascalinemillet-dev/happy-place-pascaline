@@ -118,6 +118,41 @@ export async function saveProposedTitle(submissionId: string, title: string | nu
   if (error) throw error;
 }
 
+type PublishedBlocker = {
+  description: string | null;
+  severity: BlockerSeverity;
+  department: string;
+};
+
+/**
+ * Ce que le manager ou l'admin a changé en publiant un point bloquant (US71) :
+ * description, sévérité, pôle. Comparaison entre la soumission de l'auteur et le point publié.
+ */
+export function publishedChanges(s: Submission, b: PublishedBlocker | undefined): string[] {
+  if (!b || s.kind !== "point bloquant") return [];
+  const out: string[] = [];
+  if ((b.description ?? "").trim() !== s.content.trim()) out.push("description");
+  if (s.severity && b.severity !== s.severity) out.push("sévérité");
+  // Une soumission de l'admin porte l'équipe « Admin » : son pôle est toujours choisi à la publication.
+  if (s.team !== "Admin" && b.department.trim().toLowerCase() !== s.team.trim().toLowerCase())
+    out.push("pôle");
+  return out;
+}
+
+async function fetchPublishedBlockers(ids: string[]) {
+  const map = new Map<
+    string,
+    PublishedBlocker & { status: Enums["blocker_status"]; updated_at: string }
+  >();
+  if (ids.length === 0) return map;
+  const { data } = await db
+    .from("blockers")
+    .select("id, status, updated_at, description, severity, department")
+    .in("id", ids);
+  for (const b of data ?? []) map.set(b.id, b);
+  return map;
+}
+
 export type MySubmission = Submission & {
   last_change_at: string;
   blocker_status: Enums["blocker_status"] | null;
@@ -170,15 +205,9 @@ export async function fetchMySubmissionsDetailed(
     .order("changed_at", { ascending: true });
   for (const h of hist ?? []) changes.set(h.submission_id, h.changed_at);
 
-  const blockerIds = rows.map((r) => r.blocker_id).filter((id): id is string => !!id);
-  const blockers = new Map<string, { status: Enums["blocker_status"]; updated_at: string }>();
-  if (blockerIds.length) {
-    const { data: bl } = await db
-      .from("blockers")
-      .select("id, status, updated_at")
-      .in("id", blockerIds);
-    for (const b of bl ?? []) blockers.set(b.id, { status: b.status, updated_at: b.updated_at });
-  }
+  const blockers = await fetchPublishedBlockers(
+    rows.map((r) => r.blocker_id).filter((id): id is string => !!id),
+  );
 
   return rows.map((r) => {
     const b = r.blocker_id ? blockers.get(r.blocker_id) : undefined;
@@ -191,6 +220,7 @@ export async function fetchMySubmissionsDetailed(
       last_change_at: last,
       blocker_status: b?.status ?? null,
       blocker_updated_at: b?.updated_at ?? null,
+      published_changes: publishedChanges(r, b),
     };
   });
 }
@@ -215,7 +245,14 @@ export async function fetchTeamSubmissions(
   if (filters.kind !== "tous") query = query.eq("kind", filters.kind);
   const { data, error } = await query.order("created_at", { ascending: false }).limit(20);
   if (error) throw error;
-  return (data ?? []) as Submission[];
+  const rows = (data ?? []) as Submission[];
+  const blockers = await fetchPublishedBlockers(
+    rows.map((r) => r.blocker_id).filter((id): id is string => !!id),
+  );
+  return rows.map((r) => ({
+    ...r,
+    published_changes: publishedChanges(r, r.blocker_id ? blockers.get(r.blocker_id) : undefined),
+  }));
 }
 
 /* ---------- US68 : modifier et renvoyer une soumission refusée, ou l'archiver ---------- */

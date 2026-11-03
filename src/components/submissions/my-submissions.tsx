@@ -36,6 +36,16 @@ export function statusBadge(s: Submission): { label: string; className: string }
   return { label: "EN ATTENTE", className: "bg-surface-container-high text-on-surface-variant" };
 }
 
+/** Point bloquant publié avec des changements du manager ou de l'admin : le lien avec le point publié. */
+export function PublishedChangesNote({ changes }: { changes?: string[] }) {
+  if (!changes?.length) return null;
+  return (
+    <p className="mt-xs inline-block px-xs py-0.5 font-label-sm text-label-sm uppercase bg-tertiary-fixed text-on-tertiary-fixed">
+      Publiée avec modification : {changes.join(", ")}
+    </p>
+  );
+}
+
 function AssignedTo({ s }: { s: MySubmission }) {
   const names = useQuery({
     queryKey: ["assignees", "author", s.team],
@@ -266,6 +276,7 @@ export function MySubmissions({
                   </>
                 )}
               </p>
+              {s.status === "validée" && <PublishedChangesNote changes={s.published_changes} />}
               {s.status === "refusée" && s.rejection_category && (
                 <div className="mt-xs p-xs bg-error-container text-on-error-container text-body-sm wrap-anywhere">
                   <p className="font-bold">Motif : {s.rejection_category}</p>
