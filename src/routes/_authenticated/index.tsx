@@ -20,13 +20,15 @@ import { ModuleHint, hintId } from "@/components/module-hint";
 import { Button } from "@/components/ui/button";
 import {
   fetchBlockers,
-  fetchMetrics,
-  deltaText,
-  comparedText,
-  dateFr,
-  dashboardMetrics,
+  fetchIndicateursDuMois,
+  indicateursDashboard,
+  ecartFleche,
+  ecartText,
   formatMetricValue,
-  periodText,
+  moisText,
+  moisTitre,
+  EVOLUTION_CLASSES,
+  EVOLUTION_LABELS,
   fetchNews,
   exportMyRecentSubmissions,
   type News,
@@ -36,8 +38,7 @@ import {
   deleteDraftNews,
   timeAgo,
   updateBlockerStatus,
-  TREND_LABELS,
-  type Metric,
+  type IndicateurMois,
 } from "@/lib/dashboard";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -73,31 +74,47 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
   );
 }
 
-function trendText(m: Metric | undefined) {
-  return m ? TREND_LABELS[m.trend] : "";
-}
-
-/** Carte d'indicateur (US40) : valeur, période de calcul, écart et saisie comparée, date de mise à jour. */
-function MetricCard({ m, fallback }: { m: Metric | undefined; fallback: string }) {
-  const trend = m ? [trendText(m), deltaText(m), comparedText(m)].filter(Boolean).join(" · ") : "";
+/**
+ * Carte d'indicateur (F4 révisée, 2026-11-03) : nom, valeur du mois choisi par
+ * l'admin, évolution par rapport au mois précédent. Vert si l'évolution est
+ * favorable, rouge si elle est défavorable, gris si l'écart est nul ou si le
+ * mois précédent n'a pas de valeur (N.C.).
+ */
+function MetricCard({ m, fallback }: { m: IndicateurMois | undefined; fallback: string }) {
+  const hasValue = m?.value != null;
+  const evo = m?.evolution ?? null;
   return (
     <div className="p-sm bg-card border border-outline-variant text-center">
       <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
         {m?.label ?? fallback}
       </p>
       <p className="font-display text-[32px] text-primary">
-        {m ? formatMetricValue(m.value, m.unit, m.comptage) : "—"}
+        {m && hasValue ? formatMetricValue(m.value as number, m.unit, m.comptage) : "—"}
       </p>
-      {m && (
-        <>
-          <p className="text-[11px] text-primary font-label-sm">
-            Période : {periodText(m.period_start, m.period_end)}
-          </p>
-          {trend && <p className="text-[10px] text-on-surface-variant font-label-sm">{trend}</p>}
-          <p className="text-[10px] text-on-surface-variant font-label-sm">
-            Mis à jour le {dateFr(m.updated_at)}
-          </p>
-        </>
+      {m && !hasValue && (
+        <p className="text-[11px] text-on-surface-variant font-label-sm">
+          Non renseigné pour {moisText(m.mois)}
+        </p>
+      )}
+      {m && hasValue && evo && (
+        <p className={`text-[12px] font-label-sm font-bold ${EVOLUTION_CLASSES[evo]}`}>
+          <span className="sr-only">Évolution {EVOLUTION_LABELS[evo]} : </span>
+          {evo === "nc" ? (
+            "N.C."
+          ) : (
+            <>
+              <span aria-hidden="true">{ecartFleche(m.ecart)} </span>
+              {ecartText(m.ecart, m.unit, m.comptage)}
+            </>
+          )}
+        </p>
+      )}
+      {m && hasValue && (
+        <p className="text-[10px] text-on-surface-variant font-label-sm">
+          {evo === "nc"
+            ? `Pas de valeur pour ${moisText(m.mois_precedent)}`
+            : `vs ${moisText(m.mois_precedent)}`}
+        </p>
       )}
     </div>
   );
@@ -161,7 +178,8 @@ function ManagerSpace() {
 
   const news = useQuery({ queryKey: ["news"], queryFn: fetchNews, retry: false });
   const blockers = useQuery({ queryKey: ["blockers"], queryFn: fetchBlockers, retry: false });
-  const metrics = useQuery({ queryKey: ["metrics"], queryFn: fetchMetrics, retry: false });
+  const metrics = useQuery({ queryKey: ["metrics", "mois"], queryFn: fetchIndicateursDuMois, retry: false });
+  const moisAffiche = metrics.data?.[0]?.mois ?? null;
   const onError = (e: unknown) => toast.error((e as Error).message);
 
   const exportReport = useMutation({
@@ -625,20 +643,28 @@ function ManagerSpace() {
           >
             <div className="flex items-center justify-between mb-xs">
               <h2 className="font-headline-sm text-headline-sm text-primary">Indicateurs</h2>
-              {isAdmin && (
-                <Link
-                  to="/manage/metrics"
-                  aria-label="Choisir les indicateurs affichés"
-                  title="Choisir les indicateurs affichés"
-                  className="text-on-surface-variant hover:text-primary"
-                >
-                  <Icon name="settings" />
-                </Link>
-              )}
+              <div className="flex items-center gap-xs">
+                {moisAffiche && (
+                  <p className="font-label-sm text-label-sm text-primary uppercase">
+                    <span className="sr-only">Mois des indicateurs : </span>
+                    {moisTitre(moisAffiche)}
+                  </p>
+                )}
+                {isAdmin && (
+                  <Link
+                    to="/manage/metrics"
+                    aria-label="Choisir le mois et les indicateurs affichés"
+                    title="Choisir le mois et les indicateurs affichés"
+                    className="text-on-surface-variant hover:text-primary"
+                  >
+                    <Icon name="settings" />
+                  </Link>
+                )}
+              </div>
             </div>
             <ModuleHint module="indicateurs" className="mb-md" />
             {/* Indicateurs choisis par l'admin (US43), dans leur ordre ; la grille passe à la ligne */}
-            {metrics.isSuccess && dashboardMetrics(metrics.data).length === 0 ? (
+            {metrics.isSuccess && indicateursDashboard(metrics.data).length === 0 ? (
               <p className="text-body-sm text-on-surface-variant italic mb-md">
                 Aucun indicateur n'est affiché pour le moment.
                 {isAdmin && " Choisissez-les dans « Gérer les données > Indicateurs »."}
@@ -646,7 +672,7 @@ function ManagerSpace() {
             ) : (
               <div className="grid grid-cols-2 gap-sm mb-md">
                 {metrics.isSuccess ? (
-                  dashboardMetrics(metrics.data).map((m) => (
+                  indicateursDashboard(metrics.data).map((m) => (
                     <MetricCard key={m.key} m={m} fallback={m.label} />
                   ))
                 ) : (

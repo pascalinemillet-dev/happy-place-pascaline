@@ -159,6 +159,8 @@ SELECT k, l, v, u, t, c,
 -- Indicateurs affichés sur le dashboard (US43) : les deux de la V1, dans le même ordre
 UPDATE public.metrics SET afficher_dashboard = true, ordre_dashboard = 1 WHERE key = 'taux_placement';
 UPDATE public.metrics SET afficher_dashboard = true, ordre_dashboard = 2 WHERE key = 'missions_actives';
+-- Sens favorable (F4 révisée) : un délai qui baisse est une bonne nouvelle
+UPDATE public.metrics SET sens_favorable = 'baisse' WHERE key = 'delai_moyen_recrutement';
 
 -- Le trigger d'historique a ajouté une ligne datée d'aujourd'hui : on la recale
 -- sur la date de mise à jour, et on retire les doublons de valeur inchangée.
@@ -167,6 +169,22 @@ UPDATE public.metrics_history h SET recorded_at = m.updated_at
  WHERE h.metric_key = m.key AND h.recorded_at > now() - interval '1 minute';
 DELETE FROM public.metrics_history a USING public.metrics_history b
  WHERE a.metric_key = b.metric_key AND a.recorded_at = b.recorded_at AND a.value = b.value AND a.id > b.id;
+
+-- Valeurs mensuelles (F4 révisée, 2026-11-03, valeurs fictives) : les deux
+-- derniers mois terminés. Le dashboard affiche le dernier et le compare au
+-- précédent ; Délai moyen de recrutement est favorable à la baisse.
+INSERT INTO public.metrics_mensuels (metric_key, mois, value)
+SELECT k, (private.dernier_mois_termine() - make_interval(months => d))::date, v
+  FROM (VALUES
+    ('taux_placement',          1, 38.6), ('taux_placement',          0, 40.6),
+    ('missions_actives',        1, 45),   ('missions_actives',        0, 34),
+    ('nps_candidats',           1, 72),   ('nps_candidats',           0, 71),
+    ('taux_acceptation',        1, 84.3), ('taux_acceptation',        0, 84.3),
+    ('delai_moyen_recrutement', 1, 33),   ('delai_moyen_recrutement', 0, 31),
+    ('taux_reponse_candidats',  1, 25.1), ('taux_reponse_candidats',  0, 27.8),
+    ('postes_ouverts',          1, 58),   ('postes_ouverts',          0, 63),
+    ('entretiens_realises',     1, 171),  ('entretiens_realises',     0, 186)) AS v(k, d, v);
+UPDATE public.indicateurs_reglages SET mois_reference = private.dernier_mois_termine();
 
 -- Historique des demandes : la date de création et la décision suivent la date de la demande
 UPDATE public.submission_status_history h

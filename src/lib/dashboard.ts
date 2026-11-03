@@ -136,6 +136,188 @@ export function deltaText(m: Pick<Metric, "delta" | "unit"> | undefined): string
   return `${sign}${abs}${suffix}`;
 }
 
+/* ============================================================
+ * F4 révisée (2026-11-03) : un mois de référence pour tous les indicateurs
+ * ========================================================== */
+
+/** favorable : vert ; defavorable : rouge ; stable (écart nul) et nc (pas de mois précédent) : gris. */
+export type Evolution = "favorable" | "defavorable" | "stable" | "nc";
+
+/** Une ligne de la vue `indicateurs_du_mois` : l'indicateur sur le mois choisi par l'admin. */
+export type IndicateurMois = {
+  key: string;
+  label: string;
+  unit: string | null;
+  comptage: boolean;
+  sens_favorable: "hausse" | "baisse";
+  afficher_dashboard: boolean;
+  ordre_dashboard: number;
+  mois: string;
+  value: number | null;
+  updated_at: string | null;
+  mois_precedent: string;
+  valeur_precedente: number | null;
+  ecart: number | null;
+  evolution: Evolution | null;
+};
+
+export async function fetchIndicateursDuMois(): Promise<IndicateurMois[]> {
+  const { data, error } = await db.from("indicateurs_du_mois").select("*");
+  if (error) throw error;
+  return (data ?? []) as IndicateurMois[];
+}
+
+/** Indicateurs choisis par l'admin pour le dashboard (US43), dans leur ordre. */
+export function indicateursDashboard(list: IndicateurMois[] | undefined): IndicateurMois[] {
+  return (list ?? [])
+    .filter((m) => m.afficher_dashboard)
+    .sort((a, b) => a.ordre_dashboard - b.ordre_dashboard || a.label.localeCompare(b.label, "fr"));
+}
+
+/** « octobre 2026 » à partir de « 2026-10-01 ». */
+export function moisText(iso: string): string {
+  const [y, m] = iso.split("-").map(Number);
+  return `${MOIS[m - 1]} ${y}`;
+}
+
+/** « Octobre 2026 », pour un titre. */
+export function moisTitre(iso: string): string {
+  const t = moisText(iso);
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/** Premier jour du mois, au format AAAA-MM-JJ. */
+export function moisIso(annee: number, mois: number): string {
+  return `${annee}-${String(mois).padStart(2, "0")}-01`;
+}
+
+/** Dernier mois terminé, à Paris : le 03/11/2026 donne « 2026-10-01 ». */
+export function dernierMoisTermine(now = new Date()): string {
+  const [y, m] = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit" })
+    .format(now)
+    .split("-")
+    .map(Number);
+  return m === 1 ? moisIso(y - 1, 12) : moisIso(y, m - 1);
+}
+
+export const MOIS_LABELS = MOIS.map((m) => m.charAt(0).toUpperCase() + m.slice(1));
+
+/** Flèche de l'évolution : sens de la valeur (la couleur dit si c'est favorable). */
+export function ecartFleche(ecart: number | null): string {
+  if (ecart == null) return "";
+  return ecart > 0 ? "▲" : ecart < 0 ? "▼" : "■";
+}
+
+/** Écart en valeur : « +2,0 pts », « −11 », « 0 pt » ; pts pour un taux en %. */
+export function ecartText(ecart: number | string | null, unit: string | null, comptage = false): string {
+  if (ecart == null) return "N.C.";
+  const e = Number(ecart);
+  if (!Number.isFinite(e)) return "N.C.";
+  const abs = Math.abs(e).toLocaleString("fr-FR", {
+    minimumFractionDigits: !comptage && unit === "%" && e !== 0 ? 1 : 0,
+    maximumFractionDigits: comptage ? 0 : 1,
+  });
+  const sign = e > 0 ? "+" : e < 0 ? "−" : "";
+  const suffix = unit === "%" ? (Math.abs(e) >= 2 ? " pts" : " pt") : unit ? ` ${unit.trim()}` : "";
+  return `${sign}${abs}${suffix}`;
+}
+
+/** Couleur de l'évolution : vert si favorable, rouge si défavorable, gris sinon. */
+export const EVOLUTION_CLASSES: Record<Evolution, string> = {
+  favorable: "text-success",
+  defavorable: "text-error",
+  stable: "text-on-surface-variant",
+  nc: "text-on-surface-variant",
+};
+
+export const EVOLUTION_LABELS: Record<Evolution, string> = {
+  favorable: "évolution favorable",
+  defavorable: "évolution défavorable",
+  stable: "stable",
+  nc: "non communiquée",
+};
+
+export type IndicateurInput = {
+  key: string;
+  label: string;
+  unit: string | null;
+  comptage: boolean;
+  sens_favorable: "hausse" | "baisse";
+  afficher_dashboard: boolean;
+  ordre_dashboard: number;
+};
+
+export async function createIndicateur(input: IndicateurInput) {
+  const { error } = await db.from("metrics").insert(input);
+  if (error) throw error;
+}
+
+export async function updateIndicateur(key: string, input: IndicateurInput) {
+  const { error } = await db
+    .from("metrics")
+    .update({ ...input, updated_at: new Date().toISOString() })
+    .eq("key", key);
+  if (error) throw error;
+}
+
+export async function fetchMoisReference(): Promise<string> {
+  const { data, error } = await db.from("indicateurs_reglages").select("mois_reference").single();
+  if (error) throw error;
+  return data.mois_reference;
+}
+
+/** Admin : change le mois affiché sur le dashboard, pour tous les indicateurs. */
+export async function updateMoisReference(mois: string) {
+  const { data, error } = await db
+    .from("indicateurs_reglages")
+    .update({ mois_reference: mois })
+    .eq("id", true)
+    .select("mois_reference");
+  if (error) throw error;
+  if (!data?.length) throw new Error("Vous n'avez pas le droit de changer le mois des indicateurs.");
+}
+
+export type ValeurMensuelle = {
+  metric_key: string;
+  mois: string;
+  value: number;
+  updated_at: string;
+  updated_by_email: string | null;
+};
+
+/** Admin : saisit ou corrige la valeur d'un indicateur pour un mois terminé. */
+export async function saveValeurMensuelle(input: { metric_key: string; mois: string; value: number }) {
+  const { error } = await db.from("metrics_mensuels").upsert(input, { onConflict: "metric_key,mois" });
+  if (error) throw error;
+}
+
+export async function fetchValeursMensuelles(key: string): Promise<ValeurMensuelle[]> {
+  const { data, error } = await db
+    .from("metrics_mensuels")
+    .select("*")
+    .eq("metric_key", key)
+    .order("mois", { ascending: false })
+    .limit(24);
+  if (error) throw error;
+  return (data ?? []) as ValeurMensuelle[];
+}
+
+/** Clés des indicateurs qui ont une valeur pour ce mois (avant de l'afficher). */
+export async function fetchClesRenseignees(mois: string): Promise<string[]> {
+  const { data, error } = await db.from("metrics_mensuels").select("metric_key").eq("mois", mois);
+  if (error) throw error;
+  return (data ?? []).map((r) => r.metric_key);
+}
+
+/** Message lisible pour les refus de la base sur les indicateurs. */
+export function messageIndicateur(e: unknown): string {
+  const msg = (e as { message?: string })?.message ?? String(e);
+  if (/n'est pas terminé/.test(msg)) return msg;
+  if (/comptage/i.test(msg)) return "Un comptage est un nombre entier.";
+  if (/duplicate key|metrics_pkey/.test(msg)) return "Cette clé technique existe déjà.";
+  return msg;
+}
+
 export function formatMetricValue(value: number | string, unit: string | null, comptage = false): string {
   const formatted = Number(value).toLocaleString("fr-FR", {
     minimumFractionDigits: !comptage && unit === "%" ? 1 : 0,

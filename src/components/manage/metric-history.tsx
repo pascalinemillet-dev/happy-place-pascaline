@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { fetchMetricHistory, formatMetricValue, periodText } from "@/lib/dashboard";
+import { dateFr, fetchValeursMensuelles, formatMetricValue, moisText } from "@/lib/dashboard";
 
-const fmt = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
-
+/** Valeurs mensuelles d'un indicateur (F4 révisée), du mois le plus récent au plus ancien. */
 export function MetricHistory({
   metricKey,
   unit,
@@ -15,8 +14,8 @@ export function MetricHistory({
 }) {
   const [open, setOpen] = useState(false);
   const q = useQuery({
-    queryKey: ["metrics", "history", metricKey],
-    queryFn: () => fetchMetricHistory(metricKey),
+    queryKey: ["metrics", "mensuels", metricKey],
+    queryFn: () => fetchValeursMensuelles(metricKey),
     enabled: open,
   });
   return (
@@ -27,22 +26,22 @@ export function MetricHistory({
         aria-expanded={open}
         className="text-[11px] font-label-sm uppercase text-on-surface-variant underline"
       >
-        {open ? "▾" : "▸"} Historique
+        {open ? "▾" : "▸"} Valeurs par mois
       </button>
       {open && (
         <div className="mt-xs border-l border-outline-variant pl-sm space-y-xs">
           {q.isLoading && <p className="text-body-sm text-on-surface-variant">Chargement…</p>}
-          {q.isError && <p className="text-body-sm text-error">Impossible de charger l'historique.</p>}
+          {q.isError && <p className="text-body-sm text-error">Impossible de charger les valeurs.</p>}
           {q.data?.length === 0 && (
-            <p className="text-body-sm italic text-on-surface-variant">Aucune valeur enregistrée.</p>
+            <p className="text-body-sm italic text-on-surface-variant">Aucune valeur mensuelle.</p>
           )}
-          {q.data?.map((h) => (
-            <p key={h.id} className="text-body-sm text-on-surface-variant">
-              <span className="font-bold text-primary">{fmt.format(new Date(h.recorded_at))}</span>
+          {q.data?.map((v) => (
+            <p key={v.mois} className="text-body-sm text-on-surface-variant">
+              <span className="font-bold text-primary">{moisText(v.mois)}</span>
               {" — "}
-              {formatMetricValue(h.value, unit, comptage)}
-              {" · "}
-              {periodText(h.period_start, h.period_end)}
+              {formatMetricValue(v.value, unit, comptage)}
+              {" · saisi le "}
+              {dateFr(v.updated_at)}
             </p>
           ))}
         </div>

@@ -27,3 +27,30 @@ describe("metric numeric formatting", () => {
     expect(formatMetricValue("10.86", null)).toBe("10,9");
   });
 });
+const { ecartText, ecartFleche, moisText, moisTitre, dernierMoisTermine } = await import("./dashboard");
+
+describe("F4 révisée : évolution par rapport au mois précédent", () => {
+  test("écart d'un taux en points, avec une décimale", () => {
+    expect(ecartText("2.0", "%")).toBe("+2,0 pts");
+    expect(ecartText(0.5, "%")).toBe("+0,5 pt");
+  });
+  test("écart d'un comptage, entier avec un vrai signe moins", () => {
+    expect(ecartText(-11, null, true)).toBe("−11");
+  });
+  test("écart nul affiché 0, sans signe", () => {
+    expect(ecartText("0.0", "%")).toBe("0 pt");
+    expect(ecartFleche(0)).toBe("■");
+  });
+  test("sans mois précédent : N.C.", () => {
+    expect(ecartText(null, "%")).toBe("N.C.");
+  });
+  test("mois en toutes lettres", () => {
+    expect(moisText("2026-10-01")).toBe("octobre 2026");
+    expect(moisTitre("2026-10-01")).toBe("Octobre 2026");
+  });
+  test("dernier mois terminé, à Paris", () => {
+    expect(dernierMoisTermine(new Date("2026-11-03T09:00:00Z"))).toBe("2026-10-01");
+    expect(dernierMoisTermine(new Date("2026-10-31T23:30:00Z"))).toBe("2026-10-01");
+    expect(dernierMoisTermine(new Date("2026-01-15T12:00:00Z"))).toBe("2025-12-01");
+  });
+});

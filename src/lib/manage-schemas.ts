@@ -77,7 +77,8 @@ export const blockerSchema = z.object({
   }),
 });
 
-export const metricSchema = z.object({
+/** Définition d'un indicateur (F4 révisée) : la valeur se saisit par mois. */
+export const indicateurSchema = z.object({
   key: z
     .string()
     .trim()
@@ -85,28 +86,30 @@ export const metricSchema = z.object({
     .max(40, "40 caractères maximum")
     .regex(/^[a-z0-9_]+$/, "Minuscules, chiffres et _ uniquement"),
   label: z.string().trim().min(2, "Libellé requis").max(60, "60 caractères maximum"),
-  value: z
-    .number({ invalid_type_error: "Valeur numérique requise" })
-    .finite("Valeur numérique requise"),
   unit: z.string().trim().max(8, "8 caractères maximum").nullable(),
   comptage: z.boolean(),
-  period_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date de début requise"),
-  period_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date de fin requise"),
+  sens_favorable: z.enum(["hausse", "baisse"], { errorMap: () => ({ message: "Choisissez le sens favorable" }) }),
   afficher_dashboard: z.boolean(),
   ordre_dashboard: z
     .number({ invalid_type_error: "Ordre de 1 à 99" })
     .int("Ordre de 1 à 99")
     .min(1, "Ordre de 1 à 99")
     .max(99, "Ordre de 1 à 99"),
-})
-  .refine((m) => m.period_end >= m.period_start, {
-    message: "La fin de la période doit suivre son début",
-    path: ["period_end"],
-  })
-  .refine((m) => !m.comptage || Number.isInteger(m.value), {
-    message: "Un comptage est un nombre entier",
-    path: ["value"],
+});
+
+/** Valeur d'un indicateur pour un mois terminé (mois au format AAAA-MM-01). */
+export function valeurMensuelleSchema(comptage: boolean, dernierMois: string) {
+  return z.object({
+    mois: z
+      .string()
+      .regex(/^\d{4}-\d{2}-01$/, "Choisissez un mois et une année")
+      .refine((m) => m <= dernierMois, "Ce mois n'est pas terminé"),
+    value: z
+      .number({ invalid_type_error: "Valeur numérique requise" })
+      .finite("Valeur numérique requise")
+      .refine((v) => !comptage || Number.isInteger(v), "Un comptage est un nombre entier"),
   });
+}
 
 export type FieldErrors = Record<string, string>;
 

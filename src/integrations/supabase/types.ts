@@ -183,6 +183,27 @@ export type Database = {
         }
         Relationships: []
       }
+      indicateurs_reglages: {
+        Row: {
+          id: boolean
+          mois_reference: string
+          updated_at: string
+          updated_by_email: string | null
+        }
+        Insert: {
+          id?: boolean
+          mois_reference: string
+          updated_at?: string
+          updated_by_email?: string | null
+        }
+        Update: {
+          id?: boolean
+          mois_reference?: string
+          updated_at?: string
+          updated_by_email?: string | null
+        }
+        Relationships: []
+      }
       manager_teams: {
         Row: {
           allowed_user_id: string
@@ -228,9 +249,10 @@ export type Database = {
           ordre_dashboard: number
           period_end: string | null
           period_start: string | null
+          sens_favorable: string
           unit: string | null
           updated_at: string
-          value: number
+          value: number | null
         }
         Insert: {
           afficher_dashboard?: boolean
@@ -240,9 +262,10 @@ export type Database = {
           ordre_dashboard?: number
           period_end?: string | null
           period_start?: string | null
+          sens_favorable?: string
           unit?: string | null
           updated_at?: string
-          value: number
+          value?: number | null
         }
         Update: {
           afficher_dashboard?: boolean
@@ -252,9 +275,10 @@ export type Database = {
           ordre_dashboard?: number
           period_end?: string | null
           period_start?: string | null
+          sens_favorable?: string
           unit?: string | null
           updated_at?: string
-          value?: number
+          value?: number | null
         }
         Relationships: []
       }
@@ -284,6 +308,38 @@ export type Database = {
           value?: number
         }
         Relationships: []
+      }
+      metrics_mensuels: {
+        Row: {
+          metric_key: string
+          mois: string
+          updated_at: string
+          updated_by_email: string | null
+          value: number
+        }
+        Insert: {
+          metric_key: string
+          mois: string
+          updated_at?: string
+          updated_by_email?: string | null
+          value: number
+        }
+        Update: {
+          metric_key?: string
+          mois?: string
+          updated_at?: string
+          updated_by_email?: string | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metrics_mensuels_metric_key_fkey"
+            columns: ["metric_key"]
+            isOneToOne: false
+            referencedRelation: "metrics"
+            referencedColumns: ["key"]
+          },
+        ]
       }
       news: {
         Row: {
@@ -486,6 +542,25 @@ export type Database = {
       }
     }
     Views: {
+      indicateurs_du_mois: {
+        Row: {
+          afficher_dashboard: boolean | null
+          comptage: boolean | null
+          ecart: number | null
+          evolution: string | null
+          key: string | null
+          label: string | null
+          mois: string | null
+          mois_precedent: string | null
+          ordre_dashboard: number | null
+          sens_favorable: string | null
+          unit: string | null
+          updated_at: string | null
+          valeur_precedente: number | null
+          value: number | null
+        }
+        Relationships: []
+      }
       metrics_with_trend: {
         Row: {
           afficher_dashboard: boolean | null

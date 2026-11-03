@@ -5,7 +5,7 @@
  */
 export const MODULE_HINTS = {
   "points-bloquants": "Ce qui freine le travail en ce moment, et où en est sa résolution.",
-  indicateurs: "Les chiffres clés du cabinet, avec leur période de calcul.",
+  indicateurs: "Les chiffres clés du cabinet sur le dernier mois terminé, comparés au mois précédent.",
   actus: "Les annonces du cabinet, publiées par les managers et l'administration.",
   soumettre: "Proposez une idée ou signalez un point bloquant à votre équipe d'encadrement.",
   "mes-soumissions": "Le suivi de vos idées et points bloquants : statut, décision et raison.",
