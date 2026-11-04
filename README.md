@@ -43,7 +43,7 @@ La connexion se fait par email et mot de passe, réservée aux adresses invitée
 1. Dans ton dépôt GitHub, ouvre le dossier **supabase**, puis le fichier **setup.sql**. Clique sur l'icône **Copy raw file** (deux carrés superposés, au-dessus du code à droite).
 2. Dans Supabase : **SQL Editor** → **+ New query**. Colle, puis clique sur **Run**.
 3. Si Supabase te demande comment gérer la sécurité des tables (RLS), choisis **Run without RLS** : le script active lui-même les règles de sécurité sur toutes les tables. Si un avertissement parle de « destructive operations », clique sur **Run this query**.
-4. Un tableau de 111 lignes apparaît : **toutes les lignes doivent indiquer `ok = true`**.
+4. Un tableau de 116 lignes apparaît : **toutes les lignes doivent indiquer `ok = true`**.
 5. Fais de même avec **seed.sql** (les données de démo), dans une **nouvelle** requête. Résultat attendu : « Success. No rows returned ».
 
 > Tu peux relancer `seed.sql` à tout moment pour remettre les contenus de démo dans leur état de départ. Les profils créés sont conservés.
@@ -102,7 +102,7 @@ La base contient aussi dix membres fictifs de Bigger Boat (`@biggerboat.example`
 
 ## F1 « Signaler un point bloquant » (lot 1)
 
-- **Base déjà installée** : dans Supabase, **SQL Editor** → **+ New query**, colle le contenu de `supabase/migrations/20261031090000_f1_point_bloquant.sql`, puis **Run**, et de même pour chaque migration plus récente, dans l'ordre des noms. Lance ensuite `select * from private.run_smoke_tests();` : toutes les lignes doivent être à `ok = true` (111 au 2026-11-04). Sur un projet neuf, `setup.sql` contient déjà toutes les migrations.
+- **Base déjà installée** : dans Supabase, **SQL Editor** → **+ New query**, colle le contenu de `supabase/migrations/20261031090000_f1_point_bloquant.sql`, puis **Run**, et de même pour chaque migration plus récente, dans l'ordre des noms. Lance ensuite `select * from private.run_smoke_tests();` : toutes les lignes doivent être à `ok = true` (116 au 2026-11-04). Sur un projet neuf, `setup.sql` contient déjà toutes les migrations.
 - **IA (titre US31 et récap US64)** : le Worker Cloudflare lit les données sous l'identité de l'utilisateur, puis appelle le scénario Make « HappyPlace - IA », qui appelle OpenAI. Dans Cloudflare (Workers → `happy-place-pascaline` → Settings → Variables and Secrets), ajoute en **Secret** `MAKE_AI_WEBHOOK_URL` (adresse du webhook Make) et `MAKE_AI_SECRET` (chaîne que le scénario vérifie dans l'en-tête `x-happyplace-secret`). Sans ces secrets, l'app marche sans IA : titre saisi à la main, récap en tableau.
 - **Scénario Make attendu** : webhook personnalisé → filtre sur l'en-tête `x-happyplace-secret` → OpenAI « Generate a response » (Instructions = `consigne`, Prompt = `texte`, modèle `gpt-4o-mini`, Temperature 0.2, **Store : No**, **Create a new conversation : No**, réponse en texte) → **Webhook response** (statut 200, corps = résultat du module OpenAI). Store sur No : OpenAI ne conserve pas la réponse. L'app retrouve elle-même le JSON du récap dans la réponse ; si Make répond « Accepted » (scénario arrêté ou filtre bloquant), l'app passe en version sans IA.
 

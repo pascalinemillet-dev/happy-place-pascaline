@@ -723,7 +723,10 @@ export async function createBlocker(input: BlockerInput) {
   const { error } = await db
     .from("blockers")
     .insert({ ...input, severity: input.severity as Enums["blocker_severity"], status: input.status as Enums["blocker_status"], updated_at: new Date().toISOString() });
-  if (error) throw error;
+  if (error) {
+    if (error.code === "23503") throw new Error("Choisissez un pôle du référentiel.");
+    throw error;
+  }
 }
 
 export async function updateBlocker(id: string, input: BlockerInput) {
@@ -735,6 +738,7 @@ export async function updateBlocker(id: string, input: BlockerInput) {
   if (error) {
     // Pôle hors des équipes du manager : la base refuse la ligne (RLS).
     if (error.code === "42501") throw new Error("Choisissez une de vos équipes comme pôle.");
+    if (error.code === "23503") throw new Error("Choisissez un pôle du référentiel.");
     throw error;
   }
   if (!data?.length) throw new Error(BLOCKER_FORBIDDEN);

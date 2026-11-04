@@ -188,11 +188,8 @@ function ManageBlockers() {
                 value={form.department}
                 onChange={(e) => setForm({ ...form, department: e.target.value })}
               >
-                <option value="">Choisis une équipe</option>
-                {/* Un pôle saisi à la main avant F1 reste sélectionnable jusqu'à sa correction. */}
-                {form.department && !teams.data?.includes(form.department) && (
-                  <option value={form.department}>{form.department} (hors référentiel)</option>
-                )}
+                {/* 2026-11-04 : le pôle se choisit uniquement dans le référentiel (contrainte en base). */}
+                <option value="">Choisis un pôle</option>
                 {teams.data?.map((t) => (
                   <option key={t} value={t}>
                     {t}

@@ -28,8 +28,12 @@ DELETE FROM public.teams t
  WHERE NOT t.is_reserved
    AND t.name NOT IN ('Accounting', 'Direction Commerciale', 'Direction Conseil', 'Direction recrutement',
                       'Finance', 'Legal', 'Marketing', 'Opérations', 'People', 'Pôle Data et IA',
-                      'Product', 'Relation clients')
+                      'Product', 'Relation clients',
+                      -- Les 6 pôles du référentiel (2026-11-04) restent.
+                      'Recrutement et conseil', 'Commercial et marketing', 'Produit, Data et IA',
+                      'People et opérations', 'Finance et juridique', 'Cloud et cybersécurité')
    AND NOT EXISTS (SELECT 1 FROM public.allowed_users u WHERE u.team = t.name)
+   AND NOT EXISTS (SELECT 1 FROM public.blockers b WHERE b.department = t.name)
    AND NOT EXISTS (SELECT 1 FROM public.manager_teams m WHERE m.team = t.name);
 
 -- 2. Membres fictifs de Bigger Boat (sans compte de connexion : ils peuplent
@@ -112,13 +116,14 @@ INSERT INTO public.submissions (author_name, team, content, status, kind, severi
 ('Hugo Martin', 'People', 'Le partage d’écran plante pendant les entretiens visio avec les candidats.', 'en attente', 'point bloquant', 'warning', now() - interval '3 days');
 
 -- 5. Points bloquants
+-- Pôles du référentiel (2026-11-04 : le pôle d'un point bloquant est obligatoirement dans teams).
 INSERT INTO public.blockers (title, description, department, severity, status, created_at, updated_at) VALUES
-('Pénurie de profils DevSecOps seniors', 'Trois mandats prioritaires ouverts depuis plus de 30 jours avec peu de candidats disponibles en Île-de-France.', 'CLOUD & CYBERSÉCURITÉ', 'critical', 'EN COURS', now() - interval '17 days', now() - interval '17 days'),
-('Brief client incomplet — Head of Product', 'Les critères de séniorité et le périmètre managérial doivent être clarifiés avant la reprise du sourcing.', 'PRODUCT TEAM', 'warning', 'EN COURS', now() - interval '17 days', now() - interval '17 days'),
-('Délai de validation des tests techniques', 'Le retour client dépasse actuellement cinq jours et entraîne la perte de candidats en phase finale.', 'RELATIONS CLIENTS', 'critical', 'OUVERT', now() - interval '17 days', now() - interval '17 days'),
-('Faible taux de réponse sur les profils Data', 'Le taux de réponse aux approches directes est passé sous 18 % sur les Data Engineers seniors.', 'DATA & IA', 'warning', 'SURVEILLANCE', now() - interval '17 days', now() - interval '17 days'),
-('Capacité limitée sur le pôle Cybersécurité', 'Deux nouveaux mandats nécessitent un renfort temporaire en sourcing spécialisé.', 'DIRECTION RECRUTEMENT', 'warning', 'SURVEILLANCE', now() - interval '17 days', now() - interval '17 days'),
-('Import des candidatures dans l’ATS', 'Les dossiers actifs ont été repris et contrôlés dans le nouvel outil de suivi.', 'OPÉRATIONS', 'warning', 'EN COURS', now() - interval '17 days', now() - interval '17 days');
+('Pénurie de profils DevSecOps seniors', 'Trois mandats prioritaires ouverts depuis plus de 30 jours avec peu de candidats disponibles en Île-de-France.', 'Cloud et cybersécurité', 'critical', 'EN COURS', now() - interval '17 days', now() - interval '17 days'),
+('Brief client incomplet — Head of Product', 'Les critères de séniorité et le périmètre managérial doivent être clarifiés avant la reprise du sourcing.', 'Produit, Data et IA', 'warning', 'EN COURS', now() - interval '17 days', now() - interval '17 days'),
+('Délai de validation des tests techniques', 'Le retour client dépasse actuellement cinq jours et entraîne la perte de candidats en phase finale.', 'Commercial et marketing', 'critical', 'OUVERT', now() - interval '17 days', now() - interval '17 days'),
+('Faible taux de réponse sur les profils Data', 'Le taux de réponse aux approches directes est passé sous 18 % sur les Data Engineers seniors.', 'Produit, Data et IA', 'warning', 'SURVEILLANCE', now() - interval '17 days', now() - interval '17 days'),
+('Capacité limitée sur le pôle Cybersécurité', 'Deux nouveaux mandats nécessitent un renfort temporaire en sourcing spécialisé.', 'Recrutement et conseil', 'warning', 'SURVEILLANCE', now() - interval '17 days', now() - interval '17 days'),
+('Import des candidatures dans l’ATS', 'Les dossiers actifs ont été repris et contrôlés dans le nouvel outil de suivi.', 'People et opérations', 'warning', 'EN COURS', now() - interval '17 days', now() - interval '17 days');
 UPDATE public.blockers SET status = 'RÉSOLU' WHERE title = 'Import des candidatures dans l’ATS';
 
 -- 6. Indicateurs (l'historique d'abord, puis la valeur actuelle)

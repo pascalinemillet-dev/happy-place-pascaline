@@ -16,7 +16,7 @@ import { MySubmissions, SHOW_ALL_EVENT } from "@/components/submissions/my-submi
 import { SubmitModal, type SentSubmission } from "@/components/submissions/submit-modal";
 import { TeamRecapPanel } from "@/components/submissions/team-recap-panel";
 import { useModuleViewed } from "@/lib/use-module-viewed";
-import { fetchMyProfile, fetchSelectableTeamNames } from "@/lib/f1";
+import { fetchMyProfile, fetchSelectableTeamNames, fetchTeamNames } from "@/lib/f1";
 import { BlockerDeleteConfirm, BlockerEditModal } from "@/components/blocker-edit";
 import { ModuleHint, hintId } from "@/components/module-hint";
 import { Button } from "@/components/ui/button";
@@ -197,6 +197,13 @@ function ManagerSpace() {
   const selectableTeams = useQuery({
     queryKey: ["teams", "selectable"],
     queryFn: fetchSelectableTeamNames,
+    retry: false,
+  });
+  // Pôles proposés à l'admin dans « Modifier » : tout le référentiel, « Admin » compris.
+  const allTeams = useQuery({
+    queryKey: ["teams", "names"],
+    queryFn: fetchTeamNames,
+    enabled: role === "admin",
     retry: false,
   });
   const norm = (t: string) => t.trim().toLowerCase();
@@ -620,7 +627,7 @@ function ManagerSpace() {
       {editingBlocker && (
         <BlockerEditModal
           blocker={editingBlocker}
-          teams={role === "admin" ? (selectableTeams.data ?? []) : (myTeams.data ?? [])}
+          teams={role === "admin" ? (allTeams.data ?? []) : (myTeams.data ?? [])}
           onClose={() => setEditingBlocker(null)}
         />
       )}
