@@ -45,8 +45,8 @@ function download(blob: Blob, name: string) {
 }
 
 const FALLBACK_TEAMS = [
-  "Accounting", "Direction Commerciale", "Direction Conseil", "Direction recrutement", "Finance", "Legal",
-  "Marketing", "Opérations", "People", "Pôle Data et IA", "Product", "Relation clients", "Admin",
+  "Cloud et cybersécurité", "Commercial et marketing", "Finance et juridique", "People et opérations",
+  "Produit, Data et IA", "Recrutement et conseil", "Admin",
 ];
 
 async function fetchTeams(): Promise<string[]> {

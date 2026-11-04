@@ -193,3 +193,7 @@ UPDATE public.submission_status_history h
  WHERE h.submission_id = s.id;
 
 COMMIT;
+
+-- 7. Référentiel en 6 pôles (décision du 2026-11-04) : les équipes de démo
+--    ci-dessus sont regroupées dans leur pôle cible.
+SELECT * FROM private.appliquer_referentiel_poles();
