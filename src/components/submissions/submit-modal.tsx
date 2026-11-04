@@ -313,7 +313,9 @@ export function SubmitModal({
               ))}
             </Select>
             <p className="text-body-sm text-on-surface-variant">
-              Votre manager ou l'administration pourra l'ajuster.
+              {isAdmin
+                ? "Le manager de l'équipe ou l'administration pourra l'ajuster."
+                : "Votre manager ou l'administration pourra l'ajuster."}
             </p>
           </Field>
         )}
