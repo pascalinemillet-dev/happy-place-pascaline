@@ -16,7 +16,8 @@ import { MySubmissions, SHOW_ALL_EVENT } from "@/components/submissions/my-submi
 import { SubmitModal, type SentSubmission } from "@/components/submissions/submit-modal";
 import { TeamRecapPanel } from "@/components/submissions/team-recap-panel";
 import { useModuleViewed } from "@/lib/use-module-viewed";
-import { fetchMyProfile } from "@/lib/f1";
+import { fetchMyProfile, fetchSelectableTeamNames } from "@/lib/f1";
+import { BlockerDeleteConfirm, BlockerEditModal } from "@/components/blocker-edit";
 import { ModuleHint, hintId } from "@/components/module-hint";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +33,7 @@ import {
   EVOLUTION_LABELS,
   fetchNews,
   exportMyRecentSubmissions,
+  type Blocker,
   type News,
   type Submission,
   timeAgo,
@@ -187,6 +189,26 @@ function ManagerSpace() {
 
   const news = useQuery({ queryKey: ["news"], queryFn: fetchNews, retry: false });
   const blockers = useQuery({ queryKey: ["blockers"], queryFn: fetchBlockers, retry: false });
+  // 2026-11-04 : filtre « Équipe » pour tous les rôles ; l'admin et le manager (ses équipes)
+  // modifient et suppriment les points bloquants depuis le dashboard.
+  const [blockerTeam, setBlockerTeam] = useState("");
+  const [editingBlocker, setEditingBlocker] = useState<Blocker | null>(null);
+  const [deletingBlocker, setDeletingBlocker] = useState<Blocker | null>(null);
+  const selectableTeams = useQuery({
+    queryKey: ["teams", "selectable"],
+    queryFn: fetchSelectableTeamNames,
+    retry: false,
+  });
+  const norm = (t: string) => t.trim().toLowerCase();
+  const myTeamKeys = new Set((myTeams.data ?? []).map(norm));
+  const canManageBlocker = (b: Blocker) =>
+    role === "admin" || (role === "manager" && myTeamKeys.has(norm(b.department)));
+  const blockerTeams = Array.from(
+    new Set([...(selectableTeams.data ?? []), ...(blockers.data ?? []).map((b) => b.department)]),
+  ).sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" }));
+  const shownBlockers = (blockers.data ?? []).filter(
+    (b) => !blockerTeam || norm(b.department) === norm(blockerTeam),
+  );
   const metrics = useQuery({ queryKey: ["metrics", "mois"], queryFn: fetchIndicateursDuMois, retry: false });
   const moisAffiche = metrics.data?.[0]?.mois ?? null;
   const onError = (e: unknown) => toast.error((e as Error).message);
@@ -428,20 +450,38 @@ function ManagerSpace() {
                  VOIR L'ARCHIVE
               </button>
             </div>
-            <ModuleHint module="points-bloquants" className="mb-md" />
+            <ModuleHint module="points-bloquants" className="mb-sm" />
+            <label className="mb-md flex flex-wrap items-center gap-xs font-label-sm text-label-sm text-on-surface-variant uppercase">
+              Équipe
+              <select
+                value={blockerTeam}
+                onChange={(e) => setBlockerTeam(e.target.value)}
+                className="border border-outline-variant bg-card px-xs py-0.5 font-body-sm normal-case text-on-surface"
+              >
+                <option value="">Toutes les équipes</option>
+                {blockerTeams.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="space-y-sm">
               {blockers.isError && (
                 <p className="text-body-sm text-error">
                   Les points bloquants sont indisponibles.
                 </p>
               )}
-              {blockers.data?.length === 0 && (
+              {blockers.data && shownBlockers.length === 0 && (
                 <p className="text-body-sm text-on-surface-variant italic">
-                  Aucun point bloquant en cours.
+                  {blockerTeam
+                    ? "Aucun point bloquant en cours pour cette équipe."
+                    : "Aucun point bloquant en cours."}
                 </p>
               )}
-              {blockers.data?.map((b) => {
+              {shownBlockers.map((b) => {
                 const critical = b.severity === "critical";
+                const manage = canManageBlocker(b);
                 return (
                   <div
                     key={b.id}
@@ -469,10 +509,11 @@ function ManagerSpace() {
                         </div>
                       </div>
                     </div>
+                    <div className="flex shrink-0 flex-col items-end gap-xs">
                     <select
                       aria-label={`Statut de ${b.title}`}
                       value={b.status}
-                      disabled={!isAdmin}
+                      disabled={!manage}
                       onChange={(e) => setBlocker.mutate({ id: b.id, status: e.target.value })}
                       className={`bg-transparent border-none text-xs font-label-sm focus:outline-none cursor-pointer ${critical ? "text-error" : "text-on-surface-variant"}`}
                     >
@@ -486,6 +527,29 @@ function ManagerSpace() {
                         RÉSOLU
                       </option>
                     </select>
+                    {manage && (
+                      <div className="flex gap-xs">
+                        <button
+                          type="button"
+                          aria-label={`Modifier ${b.title}`}
+                          title="Modifier"
+                          onClick={() => setEditingBlocker(b)}
+                          className="p-0.5 text-on-surface-variant hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <Icon name="edit" size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Supprimer ${b.title}`}
+                          title="Supprimer"
+                          onClick={() => setDeletingBlocker(b)}
+                          className="p-0.5 text-on-surface-variant hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <Icon name="delete" size={18} />
+                        </button>
+                      </div>
+                    )}
+                    </div>
                   </div>
                 );
               })}
@@ -553,6 +617,16 @@ function ManagerSpace() {
         </div>
       </main>
       <BlockerArchive open={archiveOpen} onClose={() => setArchiveOpen(false)} />
+      {editingBlocker && (
+        <BlockerEditModal
+          blocker={editingBlocker}
+          teams={role === "admin" ? (selectableTeams.data ?? []) : (myTeams.data ?? [])}
+          onClose={() => setEditingBlocker(null)}
+        />
+      )}
+      {deletingBlocker && (
+        <BlockerDeleteConfirm blocker={deletingBlocker} onClose={() => setDeletingBlocker(null)} />
+      )}
       <NewsReader news={readingNews} onClose={() => setReadingNews(null)} />
       {canWriteNews && editorOpen && (
         <NewsEditorModal

@@ -541,12 +541,17 @@ export async function fetchValidatedSubmissions(): Promise<ValidatedSubmission[]
     .sort((a, b) => (b.validated_at ?? b.created_at).localeCompare(a.validated_at ?? a.created_at));
 }
 
+/** Message quand la base n'a rien écrit : le point n'est pas d'une équipe du manager (RLS). */
+const BLOCKER_FORBIDDEN = "Ce point bloquant n'est pas modifiable avec votre compte.";
+
 export async function updateBlockerStatus(input: { id: string; status: string }) {
-  const { error } = await db
+  const { data, error } = await db
     .from("blockers")
     .update({ status: input.status as Enums["blocker_status"], updated_at: new Date().toISOString() })
-    .eq("id", input.id);
+    .eq("id", input.id)
+    .select("id");
   if (error) throw error;
+  if (!data?.length) throw new Error(BLOCKER_FORBIDDEN);
 }
 
 export async function fetchMetrics(): Promise<Metric[]> {
@@ -722,16 +727,23 @@ export async function createBlocker(input: BlockerInput) {
 }
 
 export async function updateBlocker(id: string, input: BlockerInput) {
-  const { error } = await db
+  const { data, error } = await db
     .from("blockers")
     .update({ ...input, severity: input.severity as Enums["blocker_severity"], status: input.status as Enums["blocker_status"], updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw error;
+    .eq("id", id)
+    .select("id");
+  if (error) {
+    // Pôle hors des équipes du manager : la base refuse la ligne (RLS).
+    if (error.code === "42501") throw new Error("Choisissez une de vos équipes comme pôle.");
+    throw error;
+  }
+  if (!data?.length) throw new Error(BLOCKER_FORBIDDEN);
 }
 
 export async function deleteBlocker(id: string) {
-  const { error } = await db.from("blockers").delete().eq("id", id);
+  const { data, error } = await db.from("blockers").delete().eq("id", id).select("id");
   if (error) throw error;
+  if (!data?.length) throw new Error("Ce point bloquant n'est pas supprimable avec votre compte.");
 }
 
 export async function createMetric(input: MetricInput) {
