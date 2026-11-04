@@ -116,7 +116,7 @@ function AuthPage() {
 
   return (
     <div className="min-h-dvh w-full bg-background flex flex-col">
-      <BrandHeader />
+      <BrandHeader showFeedback={false} />
       <main className="flex flex-1 items-center justify-center px-md py-lg">
         <section className="w-[min(100%,28rem)] border border-outline-variant bg-surface-container-lowest p-lg shadow-sm">
           <div className="space-y-xs">
