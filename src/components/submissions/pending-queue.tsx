@@ -17,10 +17,11 @@ import {
   ADMIN_LABEL,
   KIND_LABELS,
   adminQueue,
+  canDecide,
   countByKind,
   fetchAssigneeNames,
+  fetchTeamManagers,
   fetchTeamNames,
-  fetchTeamsWithManager,
   publishBlocker,
   sortQueue,
   trackEvent,
@@ -61,11 +62,14 @@ export function KindTag({ kind }: { kind: Submission["kind"] }) {
  */
 export function PendingQueue({
   role,
+  email,
   mode,
   onPrepareRecap,
   kindFilter,
 }: {
   role: string;
+  /** Adresse du compte connecté : il ne décide pas de ses propres soumissions (2026-11-04). */
+  email: string;
   mode: "manager" | "admin";
   onPrepareRecap?: () => void;
   kindFilter?: QueueFilter;
@@ -79,10 +83,10 @@ export function PendingQueue({
   const [rejecting, setRejecting] = useState<Submission | null>(null);
 
   const pending = useQuery({ queryKey: ["submissions"], queryFn: fetchSubmissions, retry: false });
-  const withManager = useQuery({
+  const teamManagers = useQuery({
     queryKey: ["manager_teams", "all"],
-    queryFn: fetchTeamsWithManager,
-    enabled: mode === "admin",
+    queryFn: fetchTeamManagers,
+    enabled: role === "admin",
     retry: false,
   });
   const teams = useQuery({
@@ -94,8 +98,9 @@ export function PendingQueue({
 
   const scoped = useMemo(() => {
     const all = pending.data ?? [];
-    return mode === "admin" ? adminQueue(all, withManager.data ?? new Set()) : all;
-  }, [pending.data, withManager.data, mode]);
+    return mode === "admin" ? adminQueue(all, teamManagers.data ?? new Map()) : all;
+  }, [pending.data, teamManagers.data, mode]);
+  const decides = (s: Submission) => canReview && canDecide(s, email, role, teamManagers.data);
   const counts = countByKind(scoped);
   const shown = sortQueue(scoped).filter((s) => filter === "tous" || s.kind === filter);
 
@@ -189,7 +194,8 @@ export function PendingQueue({
             <BlockerCard
               key={s.id}
               s={s}
-              canReview={canReview}
+              canReview={decides(s)}
+              own={canReview && !decides(s)}
               teams={teams.data ?? []}
               onRead={() => setReading(s)}
               onReject={() => setRejecting(s)}
@@ -198,7 +204,8 @@ export function PendingQueue({
             <IdeaCard
               key={s.id}
               s={s}
-              canReview={canReview}
+              canReview={decides(s)}
+              own={canReview && !decides(s)}
               approving={review.isPending}
               onRead={() => setReading(s)}
               onReject={() => setRejecting(s)}
@@ -212,7 +219,7 @@ export function PendingQueue({
         submission={reading}
         onClose={() => setReading(null)}
         onReject={
-          reading && canReview && reading.kind === "idée"
+          reading && decides(reading) && reading.kind === "idée"
             ? () => {
                 setRejecting(reading);
                 setReading(null);
@@ -220,7 +227,7 @@ export function PendingQueue({
             : undefined
         }
         onApprove={
-          reading && canReview && reading.kind === "idée"
+          reading && decides(reading) && reading.kind === "idée"
             ? () => review.mutate({ id: reading.id, status: "validée" })
             : undefined
         }
@@ -269,9 +276,19 @@ function CardHead({ s }: { s: Submission }) {
   );
 }
 
+/** Sa propre soumission : la décision revient à une autre personne (2026-11-04). */
+function OwnSubmissionNote() {
+  return (
+    <p className="border-t border-outline-variant pt-xs text-body-sm text-on-surface-variant">
+      Votre soumission : la décision revient à un autre manager ou à l'admin.
+    </p>
+  );
+}
+
 function IdeaCard({
   s,
   canReview,
+  own,
   approving,
   onRead,
   onReject,
@@ -279,6 +296,7 @@ function IdeaCard({
 }: {
   s: Submission;
   canReview: boolean;
+  own: boolean;
   approving: boolean;
   onRead: () => void;
   onReject: () => void;
@@ -294,6 +312,7 @@ function IdeaCard({
           EN ATTENTE DEPUIS PLUS DE 5 JOURS OUVRÉS
         </p>
       )}
+      {own && <OwnSubmissionNote />}
       {canReview && (
         <div className="flex gap-xs pt-xs">
           <button
@@ -320,12 +339,14 @@ function IdeaCard({
 function BlockerCard({
   s,
   canReview,
+  own,
   teams,
   onRead,
   onReject,
 }: {
   s: Submission;
   canReview: boolean;
+  own: boolean;
   teams: string[];
   onRead: () => void;
   onReject: () => void;
@@ -422,6 +443,7 @@ function BlockerCard({
         </div>
       </div>
 
+      {own && <OwnSubmissionNote />}
       {canReview && (
         <button
           type="button"

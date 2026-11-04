@@ -47,7 +47,7 @@ export const newSubmissionSchema = z
     kind: z.enum(["idée", "point bloquant"], { errorMap: () => ({ message: "Choisis le type de ta soumission" }) }),
     severity: z.enum(["critical", "warning", "info"]).nullable(),
     author_name: z.string().trim().min(1, "Ton nom est introuvable : recharge la page"),
-    team: z.string().trim().min(2, "Choisis une de tes équipes").max(60, "60 caractères maximum"),
+    team: z.string().trim().min(2, "Choisis l'équipe concernée").max(60, "60 caractères maximum"),
     content: z
       .string()
       .trim()

@@ -54,6 +54,7 @@ const submissionStatusLabels: Record<string, string> = {
 const empty: SubmissionInput = { author_name: "", team: "", content: "", status: "en attente" };
 
 function ManageSubmissions() {
+  const { email } = Route.useRouteContext();
   const qc = useQueryClient();
   const [form, setForm] = useState<SubmissionInput | null>(null);
   const [editing, setEditing] = useState<Submission | null>(null);
@@ -111,7 +112,7 @@ function ManageSubmissions() {
   return (
     <section className="space-y-md">
       <div className="bg-surface-container-lowest border border-outline-variant p-md">
-        <PendingQueue role="admin" mode="admin" />
+        <PendingQueue role="admin" email={email ?? ""} mode="admin" />
       </div>
       <div className="flex items-center justify-between">
         <h2 className="font-headline-sm text-headline-sm text-primary">

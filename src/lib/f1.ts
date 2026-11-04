@@ -47,9 +47,13 @@ export function assigneeLine(kind: SubmissionKind, managers: string[]): string {
   return kind === "point bloquant" ? `${list} · ${ADMIN_LABEL}` : list;
 }
 
-export function assigneeHint(kind: SubmissionKind, managers: string[]): string {
+export function assigneeHint(kind: SubmissionKind, managers: string[], forAdmin = false): string {
   if (kind === "point bloquant")
     return "La première personne qui le traite le publie ou le refuse. Vous serez en copie de l'e-mail.";
+  if (forAdmin)
+    return managers.length === 0
+      ? "Aucun manager inscrit dans cette équipe : l'administration décidera de cette idée."
+      : "Les managers de cette équipe examineront votre idée.";
   return managers.length === 0
     ? "Aucun manager inscrit dans votre équipe : l'administration examinera votre idée."
     : "Vos managers examineront votre idée.";
@@ -61,11 +65,56 @@ export async function fetchTeamNames(): Promise<string[]> {
   return (data ?? []).map((t) => t.name);
 }
 
-/** Équipes qui ont au moins un manager inscrit (lisible par l'admin seulement). */
-export async function fetchTeamsWithManager(): Promise<Set<string>> {
-  const { data, error } = await db.from("manager_teams").select("team");
+/** Équipes qu'un admin peut choisir en soumettant : le référentiel, sans l'équipe réservée « Admin ». */
+export async function fetchSelectableTeamNames(): Promise<string[]> {
+  const { data, error } = await db.from("teams").select("name, is_reserved").order("name");
   if (error) throw error;
-  return new Set((data ?? []).map((r) => r.team.toLowerCase()));
+  return (data ?? [])
+    .filter((t) => !t.is_reserved && t.name.trim().toLowerCase() !== "admin")
+    .map((t) => t.name);
+}
+
+/** Managers inscrits par équipe : nom d'équipe en minuscules → adresses (lisible par l'admin seulement). */
+export type TeamManagers = Map<string, Set<string>>;
+
+export async function fetchTeamManagers(): Promise<TeamManagers> {
+  const { data, error } = await db
+    .from("manager_teams")
+    .select("team, allowed_users!inner(email, allowed_user_roles(role))");
+  if (error) throw error;
+  const map: TeamManagers = new Map();
+  for (const r of data ?? []) {
+    const u = r.allowed_users as unknown as {
+      email: string;
+      allowed_user_roles: { role: string }[] | { role: string } | null;
+    };
+    const roles = Array.isArray(u.allowed_user_roles)
+      ? u.allowed_user_roles
+      : u.allowed_user_roles
+        ? [u.allowed_user_roles]
+        : [];
+    if (!roles.some((x) => x.role === "manager")) continue;
+    const key = r.team.trim().toLowerCase();
+    if (!map.has(key)) map.set(key, new Set());
+    map.get(key)!.add(u.email.trim().toLowerCase());
+  }
+  return map;
+}
+
+/**
+ * Peut-on valider, refuser ou publier cette soumission ? (décision du 2026-11-04,
+ * même règle que private.peut_decider_soumission). Jamais sa propre soumission,
+ * sauf l'admin auteur d'une soumission dont l'équipe n'a aucun manager inscrit.
+ */
+export function canDecide(
+  s: Pick<Submission, "submitted_by_email" | "team">,
+  me: string,
+  role: string,
+  managers: TeamManagers | undefined,
+): boolean {
+  const author = (s.submitted_by_email ?? "").trim().toLowerCase();
+  if (!author || author !== me.trim().toLowerCase()) return true;
+  return role === "admin" && !!managers && !managers.has(s.team.trim().toLowerCase());
 }
 
 export type QueueFilter = "tous" | "point bloquant" | "idée";
@@ -84,10 +133,17 @@ export function countByKind(items: Pick<Submission, "kind">[]) {
 }
 
 /** File de l'admin (option A) : tous les points bloquants, et les idées des équipes sans manager. */
-export function adminQueue(items: Submission[], teamsWithManager: Set<string>): Submission[] {
-  return items.filter(
-    (s) => s.kind === "point bloquant" || !teamsWithManager.has(s.team.toLowerCase()),
-  );
+/**
+ * File de l'admin (option A) : les points bloquants, et les idées qu'aucun autre manager
+ * ne peut trancher (équipe sans manager, ou idée de son seul manager, 2026-11-04).
+ */
+export function adminQueue(items: Submission[], managers: TeamManagers): Submission[] {
+  return items.filter((s) => {
+    if (s.kind === "point bloquant") return true;
+    const team = managers.get(s.team.trim().toLowerCase());
+    const author = (s.submitted_by_email ?? "").trim().toLowerCase();
+    return !team || [...team].every((m) => m === author);
+  });
 }
 
 export async function publishBlocker(input: {

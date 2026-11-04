@@ -22,6 +22,7 @@ import {
   assigneeLine,
   fetchAssigneeNames,
   fetchMyProfile,
+  fetchSelectableTeamNames,
   resubmitSubmission,
   trackEvent,
   type MySubmission,
@@ -39,6 +40,8 @@ export type SentSubmission = { kind: SubmissionKind; assignedTo: string };
  * Formulaire « Soumettre » : type, personne assignée, description, sévérité (US29, US30).
  * US68 : avec `resubmit`, le même formulaire modifie une soumission refusée et la renvoie.
  * Tout se modifie sauf l'équipe ; le circuit est celui d'un envoi.
+ * 2026-11-04 : l'admin choisit l'équipe concernée (obligatoire), comme un manager de plusieurs
+ * équipes ; la soumission suit alors le circuit de cette équipe (US30).
  */
 export function SubmitModal({
   role,
@@ -76,17 +79,25 @@ export function SubmitModal({
     if (!team && managerTeams.length === 1) setTeam(managerTeams[0]);
   }, [managerTeams, team]);
 
+  const isAdmin = role === "admin";
+  const choosesTeam = !resubmit && (isAdmin || role === "manager");
+  const adminTeams = useQuery({
+    queryKey: ["teams", "selectable"],
+    queryFn: fetchSelectableTeamNames,
+    enabled: !resubmit && isAdmin,
+    retry: false,
+  });
+  const teamChoices = isAdmin ? (adminTeams.data ?? []) : managerTeams;
+
   const ownTeam = resubmit
     ? resubmit.team
-    : role === "admin"
-      ? "Admin"
-      : role === "manager"
-        ? team
-        : (profile.data?.team ?? "");
+    : choosesTeam
+      ? team
+      : (profile.data?.team ?? "");
   const assignees = useQuery({
     queryKey: ["assignees", role, ownTeam],
     queryFn: () => fetchAssigneeNames(ownTeam || null),
-    enabled: !!kind && (!!resubmit || role !== "manager" || !!team),
+    enabled: !!kind && (!choosesTeam || !!team),
     retry: false,
   });
   const managers = assignees.data ?? [];
@@ -137,13 +148,7 @@ export function SubmitModal({
       kind,
       severity: kind === "point bloquant" && severity ? severity : null,
       author_name: resubmit ? resubmit.author_name : (profile.data?.fullName ?? ""),
-      team: resubmit
-        ? resubmit.team
-        : role === "collaborateur"
-          ? (profile.data?.team ?? "")
-          : role === "admin"
-            ? "Admin"
-            : team,
+      team: resubmit ? resubmit.team : choosesTeam ? team : (profile.data?.team ?? ""),
       content,
     });
     if (!result.ok) {
@@ -154,8 +159,9 @@ export function SubmitModal({
     submit.mutate(result.data);
   }
 
+  // L'admin signe au nom de l'administration ; l'équipe choisie est celle de la soumission.
   const teamLabel =
-    ownTeam === "Admin" ? "Administration HappyPlace" : ownTeam || "équipe à choisir";
+    isAdmin || ownTeam === "Admin" ? ADMIN_LABEL : ownTeam || "équipe à choisir";
 
   return (
     <Modal title={resubmit ? "Modifier et renvoyer" : "Soumettre"} onClose={onClose}>
@@ -186,11 +192,13 @@ export function SubmitModal({
           <p className="text-body-sm text-on-surface-variant">Repris de votre compte.</p>
         </div>
 
-        {!resubmit && role === "manager" && managerTeams.length > 1 && (
+        {choosesTeam && (isAdmin || managerTeams.length > 1) && (
           <Field label="Équipe concernée *" error={errors.team}>
             <Select value={team} onChange={(e) => setTeam(e.target.value)}>
-              <option value="">Choisis une de tes équipes</option>
-              {managerTeams.map((t) => (
+              <option value="">
+                {isAdmin ? "Choisis l'équipe concernée" : "Choisis une de tes équipes"}
+              </option>
+              {teamChoices.map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>
@@ -251,7 +259,7 @@ export function SubmitModal({
             <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
               Assigné à
             </p>
-            {!resubmit && role === "manager" && !team ? (
+            {choosesTeam && !team ? (
               <p className="text-body-sm text-on-surface-variant">
                 Choisis d'abord l'équipe concernée.
               </p>
@@ -263,7 +271,7 @@ export function SubmitModal({
                 <p className="text-body-sm text-on-surface-variant">
                   {ownTeam === "Admin"
                     ? "L'administration examinera votre soumission."
-                    : assigneeHint(kind, managers)}
+                    : assigneeHint(kind, managers, isAdmin)}
                 </p>
               </>
             )}

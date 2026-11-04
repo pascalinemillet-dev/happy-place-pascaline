@@ -126,7 +126,7 @@ export function SubmissionsPanel({
             <SubmissionFilters status={status} onStatus={setStatus} type={kind} onType={setKind} />
           </div>
           {status === "en attente" ? (
-            <PendingQueue role={role} mode="manager" kindFilter={kind} />
+            <PendingQueue role={role} email={email} mode="manager" kindFilter={kind} />
           ) : (
             <TeamHistory teams={managerTeams} status={status} kind={kind} onRead={onRead} />
           )}
